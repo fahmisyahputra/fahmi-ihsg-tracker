@@ -279,6 +279,11 @@ export function IpoView({ orders }: IpoViewProps) {
                                 </span>
                                 <span className="text-xs font-mono font-bold text-profit">
                                   {lotsAllotted} lots
+                                  {order.shares_ordered > 0 && (
+                                    <span className="text-[9px] font-medium text-muted-foreground/70 ml-1">
+                                      ({((order.shares_allotted / order.shares_ordered) * 100).toFixed(2)}%)
+                                    </span>
+                                  )}
                                 </span>
                               </div>
                             </div>
