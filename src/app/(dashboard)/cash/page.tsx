@@ -11,7 +11,8 @@ import {
   TrendingUp,
   TrendingDown,
   Coins,
-  History
+  History,
+  Search
 } from "lucide-react";
 import { format } from "date-fns";
 import { DateRange } from "react-day-picker";
@@ -93,6 +94,11 @@ export default function CashHistoryPage() {
   const [data, setData] = useState<CashStats | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // New Interaction State
+  const [searchQuery, setSearchQuery] = useState("");
+  const [typeFilter, setTypeFilter] = useState<"ALL" | "IN" | "OUT">("ALL");
+  const [sortBy, setSortBy] = useState<"NEWEST" | "OLDEST" | "AMOUNT_DESC" | "AMOUNT_ASC">("NEWEST");
+
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
@@ -119,6 +125,35 @@ export default function CashHistoryPage() {
     return "Transaction";
   };
 
+  // Processing Logic
+  const processedMutations = (data?.mutations || [])
+    .filter((m) => {
+      // 1. Filter by Type (Summary Cards)
+      if (typeFilter === "IN") {
+        if (m.type !== "TOPUP" && m.type !== "DIVIDEND") return false;
+      }
+      if (typeFilter === "OUT") {
+        if (m.type !== "WITHDRAWAL") return false;
+      }
+      
+      // 2. Filter by Search Query
+      if (searchQuery) {
+        const descMatch = m.description?.toLowerCase().includes(searchQuery.toLowerCase());
+        const typeMatch = getDefaultDescription(m.type).toLowerCase().includes(searchQuery.toLowerCase());
+        if (!descMatch && !typeMatch) return false;
+      }
+      
+      return true;
+    })
+    .sort((a, b) => {
+      // 3. Sort by Criteria
+      if (sortBy === "NEWEST") return new Date(b.flow_date).getTime() - new Date(a.flow_date).getTime();
+      if (sortBy === "OLDEST") return new Date(a.flow_date).getTime() - new Date(b.flow_date).getTime();
+      if (sortBy === "AMOUNT_DESC") return b.amount - a.amount;
+      if (sortBy === "AMOUNT_ASC") return a.amount - b.amount;
+      return 0;
+    });
+
   return (
     <div className="flex flex-col gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-10">
       {/* Header */}
@@ -137,25 +172,51 @@ export default function CashHistoryPage() {
         </div>
       </div>
 
-      {/* Summary Row (Banking Standard) */}
+      {/* Summary Row (Interactive Filters) */}
       <div className="grid grid-cols-3 gap-3">
-        <div className="rounded-xl border border-border bg-card p-3 shadow-sm flex flex-col gap-1">
+        <button 
+          onClick={() => setTypeFilter(typeFilter === "IN" ? "ALL" : "IN")}
+          className={cn(
+            "rounded-xl border p-3 shadow-sm flex flex-col gap-1 transition-all text-left",
+            typeFilter === "IN" 
+              ? "bg-profit/5 border-profit ring-1 ring-profit/20 scale-[1.02]" 
+              : "border-border bg-card hover:border-profit/30"
+          )}
+        >
           <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1">
-            <ArrowUpRight className="size-3 text-profit" /> Total In
+            <ArrowUpRight className={cn("size-3", typeFilter === "IN" ? "text-profit" : "text-muted-foreground/50")} /> Total In
           </p>
-          <p className="text-sm font-bold font-mono tracking-tight text-profit truncate">
+          <p className={cn("text-sm font-bold font-mono tracking-tight truncate", typeFilter === "IN" ? "text-profit" : "text-foreground")}>
             {formatIDR(data?.totalIn || 0)}
           </p>
-        </div>
-        <div className="rounded-xl border border-border bg-card p-3 shadow-sm flex flex-col gap-1">
+        </button>
+        
+        <button 
+          onClick={() => setTypeFilter(typeFilter === "OUT" ? "ALL" : "OUT")}
+          className={cn(
+            "rounded-xl border p-3 shadow-sm flex flex-col gap-1 transition-all text-left",
+            typeFilter === "OUT" 
+              ? "bg-loss/5 border-loss ring-1 ring-loss/20 scale-[1.02]" 
+              : "border-border bg-card hover:border-loss/30"
+          )}
+        >
           <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1">
-            <ArrowDownLeft className="size-3 text-loss" /> Total Out
+            <ArrowDownLeft className={cn("size-3", typeFilter === "OUT" ? "text-loss" : "text-muted-foreground/50")} /> Total Out
           </p>
-          <p className="text-sm font-bold font-mono tracking-tight text-loss truncate">
+          <p className={cn("text-sm font-bold font-mono tracking-tight truncate", typeFilter === "OUT" ? "text-loss" : "text-foreground")}>
             {formatIDR(data?.totalOut || 0)}
           </p>
-        </div>
-        <div className="rounded-xl border-2 border-primary/20 bg-primary/5 p-3 shadow-sm flex flex-col gap-1">
+        </button>
+
+        <button 
+          onClick={() => setTypeFilter("ALL")}
+          className={cn(
+            "rounded-xl border p-3 shadow-sm flex flex-col gap-1 transition-all text-left",
+            typeFilter === "ALL" 
+              ? "border-primary bg-primary/5 ring-1 ring-primary/20 scale-[1.02]" 
+              : "border-border bg-card hover:border-primary/20"
+          )}
+        >
           <p className="text-[9px] font-bold uppercase tracking-wider text-primary flex items-center gap-1">
             Net Flow
           </p>
@@ -165,10 +226,10 @@ export default function CashHistoryPage() {
           )}>
             {formatIDR(data?.netCashflow || 0)}
           </p>
-        </div>
+        </button>
       </div>
 
-      {/* Filters */}
+      {/* Main Filters (Date Range) */}
       <div className="flex flex-col gap-3">
         <div className="flex items-center justify-between gap-2 overflow-x-auto no-scrollbar py-1">
           <Tabs value={range} onValueChange={setRange} className="w-auto">
@@ -193,6 +254,30 @@ export default function CashHistoryPage() {
         )}
       </div>
 
+      {/* Advanced List Header (Search & Sort) */}
+      <div className="flex items-center gap-2">
+        <div className="relative flex-1 group">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground transition-colors group-focus-within:text-primary" />
+          <input
+            type="text"
+            placeholder="Search description..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full h-9 pl-9 pr-3 rounded-lg border border-border bg-card text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+          />
+        </div>
+        <select
+          value={sortBy}
+          onChange={(e) => setSortBy(e.target.value as any)}
+          className="h-9 px-3 rounded-lg border border-border bg-card text-[10px] font-bold uppercase tracking-wider focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary cursor-pointer"
+        >
+          <option value="NEWEST">Newest</option>
+          <option value="OLDEST">Oldest</option>
+          <option value="AMOUNT_DESC">Highest</option>
+          <option value="AMOUNT_ASC">Lowest</option>
+        </select>
+      </div>
+
       {/* Mutations List (Optimized for Mobile/Fluid) */}
       <div className={cn(
         "rounded-xl border border-border bg-card overflow-hidden shadow-sm transition-opacity duration-300",
@@ -200,8 +285,8 @@ export default function CashHistoryPage() {
       )}>
         {/* Table Header Replacement */}
         <div className="bg-muted/50 border-b border-border px-4 py-2 flex justify-between items-center">
-          <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Transaction Details</span>
-          <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Amount (Rp)</span>
+          <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Mutation Details</span>
+          <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Amount</span>
         </div>
 
         <div className="flex flex-col">
@@ -213,8 +298,8 @@ export default function CashHistoryPage() {
                 <p className="text-[10px] text-muted-foreground italic mt-0.5">Fetching historical capital movements...</p>
               </div>
             </div>
-          ) : data?.mutations.length && data.mutations.length > 0 ? (
-            data.mutations.map((m) => (
+          ) : processedMutations.length > 0 ? (
+            processedMutations.map((m) => (
               <div 
                 key={m.id} 
                 className="flex items-center justify-between gap-4 px-4 py-3 border-b border-border/50 last:border-0 hover:bg-muted/10 transition-colors"
@@ -261,7 +346,7 @@ export default function CashHistoryPage() {
           ) : (
             <div className="flex flex-col items-center justify-center gap-2 py-16 px-4 text-center">
               <History className="size-8 opacity-20 text-muted-foreground" />
-              <p className="text-xs text-muted-foreground italic">No transactions found for this period.</p>
+              <p className="text-xs text-muted-foreground italic">No transactions match these filters.</p>
             </div>
           )}
         </div>
