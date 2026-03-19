@@ -19,6 +19,7 @@ import { Input } from "@/components/ui/input";
 
 const formSchema = z.object({
   lots_allotted: z.string().min(1, "Required"),
+  sell_date: z.string().optional(),
 });
 
 interface IpoAllotFormProps {
@@ -36,6 +37,7 @@ export function IpoAllotForm({ orderId, ticker, sharesOrdered, onSuccess }: IpoA
     resolver: zodResolver(formSchema),
     defaultValues: {
       lots_allotted: lotsOrdered.toString(),
+      sell_date: new Date().toISOString().split("T")[0],
     },
   });
 
@@ -55,6 +57,7 @@ export function IpoAllotForm({ orderId, ticker, sharesOrdered, onSuccess }: IpoA
         await updateIpoStatus(orderId, "ALLOTTED", {
           shares_allotted: rawShares,
           fee_buy: 0,
+          sell_date: values.sell_date,
         });
         onSuccess();
       } catch (error) {
@@ -103,6 +106,20 @@ export function IpoAllotForm({ orderId, ticker, sharesOrdered, onSuccess }: IpoA
                   onChange={(e) => formatNumberInput(e, "lots_allotted")}
                   className="bg-background font-mono"
                 />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="sell_date"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Sell / Listing Date (Optional)</FormLabel>
+              <FormControl>
+                <Input type="date" {...field} className="bg-background" />
               </FormControl>
               <FormMessage />
             </FormItem>

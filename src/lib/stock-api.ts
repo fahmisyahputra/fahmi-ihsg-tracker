@@ -147,3 +147,39 @@ export async function getStockQuotes(
 
   return results;
 }
+
+/**
+ * Fetch a historical closing price for a ticker on a specific date.
+ * Useful for YTD calculations.
+ *
+ * @param symbol - Ticker symbol (e.g., "^JKSE")
+ * @param date - The target date
+ * @returns Closing price on that date (or the nearest previous trading day)
+ */
+export async function getHistoricalPrice(
+  symbol: string,
+  date: Date
+): Promise<number> {
+  // We fetch a small range to account for weekends/holidays
+  const start = new Date(date);
+  start.setDate(start.getDate() - 7); // Go back 7 days to be safe
+  
+  const end = new Date(date);
+  end.setDate(end.getDate() + 1);
+
+  const results = await yahooFinance.historical(symbol, {
+    period1: start.toISOString().split("T")[0],
+    period2: end.toISOString().split("T")[0],
+    interval: "1d",
+  });
+
+  if (!results || results.length === 0) return 0;
+
+  // Find the result closest to our target date (but not after it)
+  const targetTime = date.getTime();
+  const validResults = results
+    .filter((r) => new Date(r.date).getTime() <= targetTime)
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+  return validResults[0]?.adjClose ?? validResults[0]?.close ?? 0;
+}

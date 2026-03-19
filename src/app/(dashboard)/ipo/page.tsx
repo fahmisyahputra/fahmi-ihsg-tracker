@@ -21,6 +21,7 @@ async function getIpoData() {
       "id, ticker, status, shares_ordered, price_per_share, locked_amount, shares_allotted, refund_amount, order_date, attachment_url"
     )
     .eq("user_id", user.id)
+    .order("order_date", { ascending: false, nullsFirst: false })
     .order("created_at", { ascending: false });
 
   return orders || [];

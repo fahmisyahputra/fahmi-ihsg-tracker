@@ -80,6 +80,7 @@ export async function addJournalEntry(formData: {
   reflection?: string;
   target_price?: number;
   stop_loss?: number;
+  trade_type?: "REGULAR" | "IPO";
   attachment_url?: string;
 }) {
   const supabase = await createClient();
@@ -109,6 +110,7 @@ export async function addJournalEntry(formData: {
     reflection: formData.reflection,
     target_price: formData.target_price,
     stop_loss: formData.stop_loss,
+    trade_type: formData.trade_type || "REGULAR",
     attachment_url: formData.attachment_url,
   });
 

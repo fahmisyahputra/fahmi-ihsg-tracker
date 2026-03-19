@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Plus, Rocket, RotateCcw, Paperclip } from "lucide-react";
+import { Plus, Rocket, RotateCcw, Paperclip, Search } from "lucide-react";
 
 import { IpoForm } from "./forms/ipo-form";
 import { IpoAllotForm } from "./forms/ipo-allot-form";
@@ -25,7 +25,8 @@ export interface IpoOrder {
   locked_amount: number;
   shares_allotted: number;
   refund_amount: number;
-  order_date: string;
+  order_date?: string;
+  sell_date?: string;
   attachment_url?: string;
 }
 
@@ -36,6 +37,7 @@ interface IpoViewProps {
 export function IpoView({ orders }: IpoViewProps) {
   const [openAdd, setOpenAdd] = useState(false);
   const [allotOrderId, setAllotOrderId] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
   const [isPending, startTransition] = useTransition();
 
   const handleRefund = (id: string) => {
@@ -50,8 +52,12 @@ export function IpoView({ orders }: IpoViewProps) {
     }
   };
 
-  const activeOrders = orders.filter((o) => o.status === "ORDERED");
-  const pastOrders = orders.filter((o) => o.status !== "ORDERED");
+  const filteredOrders = orders.filter((o) => 
+    o.ticker.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const activeOrders = filteredOrders.filter((o) => o.status === "ORDERED");
+  const pastOrders = filteredOrders.filter((o) => o.status !== "ORDERED");
 
   return (
     <div className="flex flex-col gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-10">
@@ -76,6 +82,20 @@ export function IpoView({ orders }: IpoViewProps) {
         <p className="text-sm text-muted-foreground">
           Track your e-IPO orders, cash lockups, and allotments.
         </p>
+
+        {/* Search Bar */}
+        {orders.length > 0 && (
+          <div className="mt-5 relative group">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground transition-colors group-focus-within:text-primary" />
+            <input
+              type="text"
+              placeholder="Search IPO ticker..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full h-10 pl-10 pr-4 rounded-xl border border-border bg-card text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all shadow-sm"
+            />
+          </div>
+        )}
       </div>
 
       {orders.length === 0 ? (
@@ -120,6 +140,11 @@ export function IpoView({ orders }: IpoViewProps) {
                           <p className="text-xs text-muted-foreground font-medium">
                             Ordered: <span className="font-mono text-foreground">{lotsOrdered.toLocaleString()}</span> lots @ {formatIDR(order.price_per_share)}
                           </p>
+                          {order.order_date && (
+                            <p className="text-[10px] text-muted-foreground font-mono">
+                              Date: {new Date(order.order_date).toLocaleDateString("id-ID")}
+                            </p>
+                          )}
                           {order.attachment_url && (
                             <a
                               href={order.attachment_url}
@@ -233,32 +258,38 @@ export function IpoView({ orders }: IpoViewProps) {
                       </div>
 
                       {isAllotted && (
-                        <div className="flex items-center justify-between mt-1 pt-3 border-t border-border/50">
-                          <div className="flex gap-4">
-                            <div className="flex flex-col">
-                              <span className="text-[10px] text-muted-foreground uppercase tracking-widest">
-                                Ordered
-                              </span>
-                              <span className="text-xs font-mono font-semibold">
-                                {lotsOrdered} lots
-                              </span>
-                            </div>
-                            <div className="flex flex-col">
-                              <span className="text-[10px] text-profit uppercase tracking-widest">
-                                Allotted
-                              </span>
-                              <span className="text-xs font-mono font-bold text-profit">
-                                {lotsAllotted} lots
-                              </span>
-                            </div>
+                        <div className="flex flex-col gap-2 mt-1 pt-3 border-t border-border/50">
+                          <div className="flex justify-between items-center text-[10px] text-muted-foreground font-mono">
+                            <span>Order: {order.order_date ? new Date(order.order_date).toLocaleDateString("id-ID") : "-"}</span>
+                            <span>Listing: {order.sell_date ? new Date(order.sell_date).toLocaleDateString("id-ID") : "-"}</span>
                           </div>
-                          <div className="text-right">
-                             <span className="text-[10px] text-profit uppercase tracking-widest block mb-0.5">
-                                Nominal Value
-                              </span>
-                              <span className="text-xs font-mono font-bold text-profit bg-profit/10 px-2 py-0.5 rounded">
-                                {formatIDR(nominalAllotted)}
-                              </span>
+                          <div className="flex items-center justify-between">
+                            <div className="flex gap-4">
+                              <div className="flex flex-col">
+                                <span className="text-[10px] text-muted-foreground uppercase tracking-widest">
+                                  Ordered
+                                </span>
+                                <span className="text-xs font-mono font-semibold">
+                                  {lotsOrdered} lots
+                                </span>
+                              </div>
+                              <div className="flex flex-col">
+                                <span className="text-[10px] text-profit uppercase tracking-widest">
+                                  Allotted
+                                </span>
+                                <span className="text-xs font-mono font-bold text-profit">
+                                  {lotsAllotted} lots
+                                </span>
+                              </div>
+                            </div>
+                            <div className="text-right">
+                               <span className="text-[10px] text-profit uppercase tracking-widest block mb-0.5">
+                                  Nominal Value
+                                </span>
+                                <span className="text-xs font-mono font-bold text-profit bg-profit/10 px-2 py-0.5 rounded">
+                                  {formatIDR(nominalAllotted)}
+                                </span>
+                            </div>
                           </div>
                         </div>
                       )}

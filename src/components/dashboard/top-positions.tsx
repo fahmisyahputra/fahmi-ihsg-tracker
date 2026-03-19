@@ -64,8 +64,10 @@ export function TopPositions({ holdings }: TopPositionsProps) {
                       {formatReturnPercent(holding.unrealizedPnlPercent)}
                     </span>
                   </div>
-                  <p className="mt-0.5 text-xs text-muted-foreground">
-                    {holding.lots} lots · Avg {currentPrice.toLocaleString("id-ID")}
+                  <p className="mt-1 text-[10px] font-medium text-muted-foreground truncate">
+                    {holding.lots} Lot <span className="mx-1 text-border">•</span> 
+                    Avg {formatIDR(holding.avgPrice)} <span className="mx-1 text-border">•</span> 
+                    <span className="text-foreground">Now {formatIDR(currentPrice)}</span>
                   </p>
                 </div>
               </div>

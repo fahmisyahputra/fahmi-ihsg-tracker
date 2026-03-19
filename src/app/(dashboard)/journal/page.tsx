@@ -29,7 +29,7 @@ async function getJournalData() {
   const { data: journals } = await supabase
     .from("journals")
     .select(
-      "id, ticker, buy_date, sell_date, buy_price, sell_price, lots, initial_reasoning, reflection, realized_pnl, attachment_url"
+      "id, ticker, buy_date, sell_date, buy_price, sell_price, lots, initial_reasoning, reflection, realized_pnl, trade_type, attachment_url"
     )
     .eq("user_id", user.id)
     .order("sell_date", { ascending: false });

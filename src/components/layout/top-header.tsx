@@ -2,6 +2,7 @@
 
 import { Bell, LogOut, User } from "lucide-react";
 import { logout } from "@/app/login/actions";
+import { ProfileDialog } from "@/components/dashboard/profile-dialog";
 
 export function TopHeader() {
   return (
@@ -20,13 +21,9 @@ export function TopHeader() {
         >
           <Bell className="size-5" />
         </button>
-        <button
-          type="button"
-          className="flex size-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-          aria-label="Profile"
-        >
-          <User className="size-5" />
-        </button>
+        
+        <ProfileDialog currentName="" />
+
         <form action={logout}>
           <button
             type="submit"

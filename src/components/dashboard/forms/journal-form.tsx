@@ -20,6 +20,13 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 const formSchema = z.object({
   ticker: z.string().min(1, "Ticker is required").max(10),
@@ -32,6 +39,7 @@ const formSchema = z.object({
   fee_sell: z.string().optional(),
   initial_reasoning: z.string().optional(),
   reflection: z.string().optional(),
+  trade_type: z.enum(["REGULAR", "IPO"]),
   attachment: z.any().optional(),
 });
 
@@ -56,6 +64,7 @@ export function JournalForm({ onSuccess, defaultTicker = "" }: JournalFormProps)
       fee_sell: "0",
       initial_reasoning: "",
       reflection: "",
+      trade_type: "REGULAR",
       attachment: undefined,
     },
   });
@@ -158,6 +167,7 @@ export function JournalForm({ onSuccess, defaultTicker = "" }: JournalFormProps)
           fee_sell: rawFeeSell,
           initial_reasoning: values.initial_reasoning,
           reflection: values.reflection,
+          trade_type: values.trade_type,
           attachment_url: attachmentUrl,
         });
 
@@ -192,24 +202,51 @@ export function JournalForm({ onSuccess, defaultTicker = "" }: JournalFormProps)
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 pt-4">
-        <FormField
-          control={form.control}
-          name="ticker"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Ticker</FormLabel>
-              <FormControl>
-                <Input
-                  placeholder="BBCA"
-                  {...field}
-                  onChange={handleTickerChange}
-                  className="bg-background font-mono font-bold uppercase"
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+        <div className="grid grid-cols-2 gap-3">
+          <FormField
+            control={form.control}
+            name="ticker"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Ticker</FormLabel>
+                <FormControl>
+                  <Input
+                    placeholder="BBCA"
+                    {...field}
+                    onChange={handleTickerChange}
+                    className="bg-background font-mono font-bold uppercase"
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="trade_type"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Trade Type</FormLabel>
+                <Select
+                  onValueChange={field.onChange}
+                  defaultValue={field.value}
+                >
+                  <FormControl>
+                    <SelectTrigger className="bg-background">
+                      <SelectValue placeholder="Select type" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value="REGULAR">Regular Trade</SelectItem>
+                    <SelectItem value="IPO" className="text-primary font-bold">IPO Flip</SelectItem>
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
 
         <div className="grid grid-cols-2 gap-3">
           <FormField

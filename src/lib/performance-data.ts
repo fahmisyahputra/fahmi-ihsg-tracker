@@ -4,10 +4,10 @@
 
 import { createClient } from "@/utils/supabase/server";
 import { getDashboardData } from "@/lib/dashboard-data";
-import { startOfMonth, format, isWithinInterval, startOfYear, subDays } from "date-fns";
+import { startOfMonth, format, startOfYear, subDays, differenceInDays } from "date-fns";
 
-export interface MonthlyPerformance {
-  month: string;
+export interface TimelineData {
+  label: string;
   realizedPnL: number;
   dividendYield: number;
   ipoPnL: number;
@@ -18,7 +18,7 @@ export interface PerformanceStats {
   totalEquity: number;
   nominalGrowth: number;
   percentGrowth: number;
-  monthlyData: MonthlyPerformance[];
+  monthlyData: TimelineData[]; // Keeping name for compatibility, but content is dynamic
   topMovers: { ticker: string; pnl: number; pnlPercent: number }[];
 }
 
@@ -62,45 +62,47 @@ export async function getPerformanceData(filters: {
     else if (filters.range === "3M") startDate = subDays(new Date(), 90);
     else if (filters.range === "6M") startDate = subDays(new Date(), 180);
     else if (filters.range === "YTD") startDate = startOfYear(new Date());
-    else if (filters.range === "ALL") startDate = new Date(2000, 0, 1);
+    else if (filters.range === "ALL") startDate = new Date(2010, 0, 1); // Older fallback
   }
 
-  // 3. Fetch Realized PnL (Journals)
-  const { data: journals } = await supabase
-    .from("journals")
-    .select("ticker, sell_date, realized_pnl, buy_price, sell_price, lots")
-    .eq("user_id", user.id)
-    .gte("sell_date", startDate.toISOString())
-    .lte("sell_date", endDate.toISOString());
+  // 3. Determine Granularity
+  const daysDiff = differenceInDays(endDate, startDate);
+  const useDaily = daysDiff <= 45; // 1W and 1M use daily
 
-  // 4. Fetch Dividends (Cash Flows)
-  const { data: dividends } = await supabase
-    .from("cash_flows")
-    .select("flow_date, amount")
-    .eq("user_id", user.id)
-    .eq("type", "DIVIDEND")
-    .gte("flow_date", startDate.toISOString())
-    .lte("flow_date", endDate.toISOString());
+  // 4. Fetch Data
+  const [journalsRes, dividendsRes, snapshotsRes] = await Promise.all([
+    supabase
+      .from("journals")
+      .select("ticker, sell_date, realized_pnl, buy_price, sell_price, lots")
+      .eq("user_id", user.id)
+      .gte("sell_date", startDate.toISOString())
+      .lte("sell_date", endDate.toISOString()),
+    supabase
+      .from("cash_flows")
+      .select("flow_date, amount")
+      .eq("user_id", user.id)
+      .eq("type", "DIVIDEND")
+      .gte("flow_date", startDate.toISOString())
+      .lte("flow_date", endDate.toISOString()),
+    supabase
+      .from("portfolio_snapshots")
+      .select("snapshot_date, total_equity")
+      .eq("user_id", user.id)
+      .gte("snapshot_date", startDate.toISOString().split("T")[0])
+      .lte("snapshot_date", endDate.toISOString().split("T")[0])
+      .order("snapshot_date", { ascending: true })
+  ]);
 
-  // 5. Fetch Equity Snapshots (Portfolio Snapshots)
-  const { data: snapshots } = await supabase
-    .from("portfolio_snapshots")
-    .select("snapshot_date, total_equity")
-    .eq("user_id", user.id)
-    .gte("snapshot_date", startDate.toISOString().split("T")[0])
-    .lte("snapshot_date", endDate.toISOString().split("T")[0])
-    .order("snapshot_date", { ascending: true });
+  const journals = journalsRes.data;
+  const dividends = dividendsRes.data;
+  const snapshots = snapshotsRes.data;
 
-  // ── Aggregation ─────────────────────────────────────────────────────────────
-
-  // Aggregate Top Movers (All-time or filtered?) - User asked for Top Movers link to journals
-  // Usually Top Movers should reflect the selected time range.
+  // 5. Aggregate Top Movers
   const moversMap = new Map<string, { pnl: number; cost: number }>();
   if (journals) {
     for (const j of journals) {
       const current = moversMap.get(j.ticker) || { pnl: 0, cost: 0 };
       current.pnl += Number(j.realized_pnl);
-      // cost = buy_price * lots * 100
       current.cost += Number(j.buy_price) * Number(j.lots) * 100;
       moversMap.set(j.ticker, current);
     }
@@ -112,15 +114,17 @@ export async function getPerformanceData(filters: {
     pnlPercent: data.cost > 0 ? (data.pnl / data.cost) * 100 : 0
   }));
 
-  // Aggregation for Charts (Monthly)
-  const monthlyMap = new Map<string, MonthlyPerformance>();
+  // 6. Timeline Aggregation
+  const timelineMap = new Map<string, TimelineData>();
+  
+  const addToTimeline = (date: Date, pnl = 0, div = 0, equity = 0) => {
+    // Label format: daily "15 Mar" vs monthly "Mar"
+    const label = useDaily ? format(date, "d MMM") : format(date, "MMM yyyy");
+    // Sorting key
+    const sortKey = useDaily ? format(date, "yyyy-MM-dd") : format(date, "yyyy-MM");
 
-  // Initialize months if it's 6M-1Y range
-  // For simplicity, we'll populate the map with found data
-  const addToMonthly = (dateStr: string, pnl = 0, div = 0, equity = 0) => {
-    const monthKey = format(new Date(dateStr), "MMM");
-    const existing = monthlyMap.get(monthKey) || {
-      month: monthKey,
+    const existing = timelineMap.get(sortKey) || {
+      label,
       realizedPnL: 0,
       dividendYield: 0,
       ipoPnL: 0,
@@ -129,39 +133,44 @@ export async function getPerformanceData(filters: {
     existing.realizedPnL += pnl;
     existing.dividendYield += div;
     if (equity > 0) existing.simulatedEquity = equity;
-    monthlyMap.set(monthKey, existing);
+    timelineMap.set(sortKey, existing);
   };
 
-  if (journals) journals.forEach(j => addToMonthly(j.sell_date, Number(j.realized_pnl)));
-  if (dividends) dividends.forEach(d => addToMonthly(d.flow_date, 0, Number(d.amount)));
-  if (snapshots) snapshots.forEach(s => addToMonthly(s.snapshot_date, 0, 0, Number(s.total_equity)));
+  if (journals) journals.forEach(j => addToTimeline(new Date(j.sell_date), Number(j.realized_pnl)));
+  if (dividends) dividends.forEach(d => addToTimeline(new Date(d.flow_date), 0, Number(d.amount)));
+  if (snapshots) snapshots.forEach(s => addToTimeline(new Date(s.snapshot_date), 0, 0, Number(s.total_equity)));
 
-  // If map is empty, add current or last few months as 0s to avoid blank charts
-  if (monthlyMap.size === 0) {
-     for (let i = 5; i >= 0; i--) {
-       const m = format(subDays(new Date(), i * 30), "MMM");
-       monthlyMap.set(m, { month: m, realizedPnL: 0, dividendYield: 0, ipoPnL: 0, simulatedEquity: 0 });
-     }
-  } else if (monthlyMap.size < 4) {
-      // Pad with missing months in range? 
-      // Simplified: use sorted entries
+  // 7. Day 1 Fallback: Inject Live Point if missing for today
+  const todayKey = useDaily ? format(new Date(), "yyyy-MM-dd") : format(new Date(), "yyyy-MM");
+  if (!timelineMap.has(todayKey)) {
+    addToTimeline(new Date(), 0, 0, totalEquity);
   }
 
-  const monthlyData = Array.from(monthlyMap.values());
+  // Ensure sorting by sortKey (date)
+  const sortedHistory = Array.from(timelineMap.entries())
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([_, data]) => data);
 
-  // Calculate Growth Metrics
-  const totalPnL = (journals?.reduce((sum, j) => sum + Number(j.realized_pnl), 0) || 0);
-  const totalDiv = (dividends?.reduce((sum, d) => sum + Number(d.amount), 0) || 0);
-  const nominalGrowth = totalPnL + totalDiv;
-  
-  const startEquity = totalEquity - nominalGrowth;
-  const percentGrowth = startEquity > 0 ? (nominalGrowth / startEquity) * 100 : 0;
+  // Growth Calculation using snapshots (Actual delta)
+  // Get starting equity from first available snapshot on or before start date
+  const { data: startSnapshot } = await supabase
+    .from("portfolio_snapshots")
+    .select("total_equity")
+    .eq("user_id", user.id)
+    .lte("snapshot_date", startDate.toISOString().split("T")[0])
+    .order("snapshot_date", { ascending: false })
+    .limit(1)
+    .single();
+
+  const startEquityVal = startSnapshot ? Number(startSnapshot.total_equity) : (snapshots && snapshots.length > 0 ? Number(snapshots[0].total_equity) : totalEquity);
+  const nominalGrowth = totalEquity - startEquityVal;
+  const percentGrowth = startEquityVal > 0 ? (nominalGrowth / startEquityVal) * 100 : 0;
 
   return {
     totalEquity,
     nominalGrowth,
     percentGrowth: Number(percentGrowth.toFixed(2)),
-    monthlyData,
+    monthlyData: sortedHistory,
     topMovers,
   };
 }

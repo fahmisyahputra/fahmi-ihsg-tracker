@@ -32,8 +32,10 @@ export function StockCard({ holding }: StockCardProps) {
               {holding.allocation.toFixed(1)}% of Eq
             </span>
           </div>
-          <p className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground font-mono">
-            {holding.lots} Lots · Avg {formatIDR(holding.avgPrice)}
+          <p className="mt-1 text-[10px] font-medium text-muted-foreground truncate">
+            {holding.lots} Lot <span className="mx-1 text-border">•</span> 
+            Avg {formatIDR(holding.avgPrice)} <span className="mx-1 text-border">•</span> 
+            <span className="text-foreground">Now {formatIDR(currentPrice)}</span>
           </p>
         </div>
         <div className="text-right">

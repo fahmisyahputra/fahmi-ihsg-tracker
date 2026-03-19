@@ -7,6 +7,7 @@ export async function addIpoOrder(formData: {
   ticker: string;
   shares_ordered: number;
   price_per_share: number;
+  order_date: string;
   notes?: string;
   attachment_url?: string;
 }) {
@@ -29,6 +30,7 @@ export async function addIpoOrder(formData: {
     price_per_share: formData.price_per_share,
     locked_amount: lockedAmount,
     status: "ORDERED",
+    order_date: formData.order_date,
     notes: formData.notes,
     attachment_url: formData.attachment_url,
   });
@@ -49,6 +51,7 @@ export async function updateIpoStatus(
   allotmentData?: {
     shares_allotted: number;
     fee_buy?: number;
+    sell_date?: string;
   }
 ) {
   const supabase = await createClient();
@@ -107,6 +110,7 @@ export async function updateIpoStatus(
         shares_allotted: shares_allotted,
         refund_amount: refundAmount,
         allotment_date: nowISO,
+        sell_date: allotmentData?.sell_date,
       })
       .eq("id", id)
       .eq("user_id", user.id);

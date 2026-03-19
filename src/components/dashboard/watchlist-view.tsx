@@ -1,7 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { Plus, Target, CheckCircle2, Paperclip, ExternalLink } from "lucide-react";
+import { Plus, Target, CheckCircle2, Paperclip, ExternalLink, Search, Edit3, Save, X, Loader2, Trash2 } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { createClient } from "@/utils/supabase/client";
 import { WatchlistForm } from "./forms/watchlist-form";
 import {
   Dialog,
@@ -39,6 +41,12 @@ interface WatchlistViewProps {
 export function WatchlistView({ items }: WatchlistViewProps) {
   const [openAdd, setOpenAdd] = useState(false);
   const [focusedItemId, setFocusedItemId] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [isEditing, setIsEditing] = useState(false);
+  const [editedReasoning, setEditedReasoning] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
+  const router = useRouter();
+  const supabase = createClient();
 
   const handleSuccess = () => {
     setOpenAdd(false);
@@ -51,6 +59,46 @@ export function WatchlistView({ items }: WatchlistViewProps) {
       console.error(e);
     }
   };
+
+  const handleDeleteItem = async (id: string) => {
+    try {
+      // Direct delete from the table
+      const { error } = await supabase
+        .from("watchlist")
+        .delete()
+        .eq("id", id);
+      
+      if (error) throw error;
+      router.refresh();
+    } catch (e) {
+      console.error("Error deleting watchlist item:", e);
+      alert("Failed to delete item. Please try again.");
+    }
+  };
+
+  const handleSaveEdit = async (item: WatchlistItem) => {
+    setIsSaving(true);
+    try {
+      const { error } = await supabase
+        .from("watchlist")
+        .update({ reasoning: editedReasoning })
+        .eq("id", item.id);
+
+      if (error) throw error;
+      
+      setIsEditing(false);
+      router.refresh();
+    } catch (e) {
+      console.error("Error updating watchlist reasoning:", e);
+      alert("Failed to save changes. Please try again.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const filteredItems = items.filter((item) =>
+    item.ticker.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   return (
     <div className="flex flex-col gap-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -70,6 +118,20 @@ export function WatchlistView({ items }: WatchlistViewProps) {
         </Dialog>
       </div>
 
+      {/* Search Bar */}
+      {items.length > 0 && (
+        <div className="relative group">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground transition-colors group-focus-within:text-primary" />
+          <input
+            type="text"
+            placeholder="Search watchlist ticker..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full h-10 pl-10 pr-4 rounded-xl border border-border bg-card text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all shadow-sm"
+          />
+        </div>
+      )}
+
       {items.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-12 px-4 text-center border border-dashed border-border rounded-xl">
           <div className="size-10 rounded-full bg-muted flex items-center justify-center mb-3">
@@ -84,7 +146,7 @@ export function WatchlistView({ items }: WatchlistViewProps) {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {items.map((item) => (
+          {filteredItems.map((item) => (
             <div
               key={item.id}
               className="rounded-xl border border-border bg-card p-4 shadow-sm"
@@ -102,32 +164,74 @@ export function WatchlistView({ items }: WatchlistViewProps) {
                   </p>
                 </div>
 
-                <AlertDialog>
-                  <AlertDialogTrigger
-                    title="Mark as Done / Remove"
-                    className="text-muted-foreground hover:text-profit transition-colors"
+                <div className="flex gap-2.5 items-center">
+                  <button
+                    onClick={() => {
+                      setEditedReasoning(item.reasoning);
+                      setIsEditing(true);
+                      setFocusedItemId(item.id);
+                    }}
+                    title="Edit trading plan"
+                    className="text-muted-foreground hover:text-primary transition-colors p-1"
                   >
-                    <CheckCircle2 className="size-5" />
-                  </AlertDialogTrigger>
-                  <AlertDialogContent className="w-[90vw] max-w-sm rounded-xl">
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>Mark Plan as Done?</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        This will remove {item.ticker} from your active watchlist. You cannot undo this action directly.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>Cancel</AlertDialogCancel>
-                      <AlertDialogAction
-                        onClick={() => handleMarkDone(item.id)}
-                        className="bg-profit hover:bg-profit/90 text-white"
-                      >
-                        Yes, Mark as Done
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
+                    <Edit3 className="size-4" />
+                  </button>
+
+                  <div className="flex gap-2.5">
+                  <AlertDialog>
+                    <AlertDialogTrigger
+                      title="Mark as Done"
+                      className="text-muted-foreground hover:text-profit transition-colors"
+                    >
+                      <CheckCircle2 className="size-5" />
+                    </AlertDialogTrigger>
+                    <AlertDialogContent className="w-[90vw] max-w-sm rounded-xl">
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Mark Plan as Done?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          This will remove {item.ticker} from your active watchlist.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                          onClick={() => handleMarkDone(item.id)}
+                          className="bg-profit hover:bg-profit/90 text-white"
+                        >
+                          Yes, Mark as Done
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+
+                  <AlertDialog>
+                    <AlertDialogTrigger
+                      title="Delete entry"
+                      className="text-muted-foreground hover:text-loss transition-colors"
+                    >
+                      <Trash2 className="size-5" />
+                    </AlertDialogTrigger>
+                    <AlertDialogContent className="w-[90vw] max-w-sm rounded-xl">
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Delete Watchlist Item?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          This will permanently remove the trading plan for {item.ticker}. This action cannot be undone.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                          onClick={() => handleDeleteItem(item.id)}
+                          className="bg-loss hover:bg-loss/90 text-white"
+                        >
+                          Delete Permanently
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </div>
               </div>
+            </div>
 
               {/* Read More Dialog Wrapper */}
               <Dialog
@@ -137,6 +241,10 @@ export function WatchlistView({ items }: WatchlistViewProps) {
                 <DialogTrigger
                   className="mt-3 p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors text-sm text-foreground/90 border border-border/50 cursor-pointer group text-left w-full"
                   title="Read full notes"
+                  onClick={() => {
+                    setEditedReasoning(item.reasoning);
+                    setIsEditing(false);
+                  }}
                 >
                   <p className="line-clamp-3 leading-relaxed">{item.reasoning}</p>
                   <p className="text-[10px] font-semibold text-primary mt-2 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
@@ -163,12 +271,51 @@ export function WatchlistView({ items }: WatchlistViewProps) {
                     </div>
 
                     <div>
-                      <h4 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest mb-1.5">
-                        Conviction / Reasoning
-                      </h4>
-                      <div className="bg-muted/20 p-3 rounded-lg border border-border/50 text-sm leading-relaxed whitespace-pre-wrap text-foreground/90">
-                        {item.reasoning}
+                      <div className="flex items-center justify-between mb-2">
+                        <h4 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest">
+                          Conviction / Reasoning
+                        </h4>
+                        {isEditing && (
+                          <div className="flex items-center gap-3">
+                            <button
+                              onClick={() => handleSaveEdit(item)}
+                              disabled={isSaving}
+                              className="flex items-center gap-1 text-[10px] font-bold text-profit hover:underline transition-all disabled:opacity-50"
+                            >
+                              {isSaving ? <Loader2 className="size-3 animate-spin" /> : <Save className="size-3" />}
+                              Save
+                            </button>
+                            <button
+                              onClick={() => {
+                                setIsEditing(false);
+                                setEditedReasoning(item.reasoning);
+                                if (focusedItemId === item.id) {
+                                  // If we opened via the card's edit button, canceling should probably close or just show read mode
+                                  // For simplicity, let's keep it in the modal but in read mode.
+                                }
+                              }}
+                              disabled={isSaving}
+                              className="flex items-center gap-1 text-[10px] font-bold text-muted-foreground hover:underline transition-all disabled:opacity-50"
+                            >
+                              <X className="size-3" /> Cancel
+                            </button>
+                          </div>
+                        )}
                       </div>
+                      
+                      {isEditing ? (
+                        <textarea
+                          value={editedReasoning}
+                          onChange={(e) => setEditedReasoning(e.target.value)}
+                          className="w-full min-h-[150px] p-3 rounded-lg border border-primary/20 bg-muted/30 text-sm leading-relaxed focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all font-sans"
+                          placeholder="Why are you watching this stock? What's the catalyst?"
+                          autoFocus
+                        />
+                      ) : (
+                        <div className="bg-muted/20 p-3 rounded-lg border border-border/50 text-sm leading-relaxed whitespace-pre-wrap text-foreground/90">
+                          {item.reasoning}
+                        </div>
+                      )}
                     </div>
 
                     {item.attachment_url && (

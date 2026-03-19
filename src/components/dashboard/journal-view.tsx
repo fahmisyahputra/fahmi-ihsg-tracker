@@ -7,8 +7,15 @@ import {
   Quote, 
   Paperclip, 
   ExternalLink,
-  Trash2
+  Trash2,
+  Search,
+  Edit3,
+  Save,
+  X,
+  Loader2
 } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { createClient } from "@/utils/supabase/client";
 
 import { JournalForm } from "./forms/journal-form";
 import { deleteJournalEntry } from "@/app/actions/journal";
@@ -44,6 +51,7 @@ export interface JournalEntry {
   initial_reasoning: string | null;
   reflection: string | null;
   realized_pnl: number;
+  trade_type?: "REGULAR" | "IPO";
   attachment_url?: string;
 }
 
@@ -54,7 +62,14 @@ interface JournalViewProps {
 export function JournalView({ entries }: JournalViewProps) {
   const [openAdd, setOpenAdd] = useState(false);
   const [focusedItemId, setFocusedItemId] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [isEditing, setIsEditing] = useState(false);
+  const [editedThesis, setEditedThesis] = useState("");
+  const [editedReflection, setEditedReflection] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, startDeletion] = useTransition();
+  const router = useRouter();
+  const supabase = createClient();
 
   const handleSuccess = () => {
     setOpenAdd(false);
@@ -69,6 +84,33 @@ export function JournalView({ entries }: JournalViewProps) {
       }
     });
   };
+
+  const handleSaveEdit = async (entry: JournalEntry) => {
+    setIsSaving(true);
+    try {
+      const { error } = await supabase
+        .from("journals")
+        .update({
+          initial_reasoning: editedThesis,
+          reflection: editedReflection
+        })
+        .eq("id", entry.id);
+
+      if (error) throw error;
+      
+      setIsEditing(false);
+      router.refresh();
+    } catch (e) {
+      console.error("Error updating journal notes:", e);
+      alert("Failed to save changes. Please try again.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const filteredEntries = entries.filter((entry) =>
+    entry.ticker.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   const formatDate = (isoString: string) => {
     return new Date(isoString).toLocaleDateString("id-ID", {
@@ -96,6 +138,20 @@ export function JournalView({ entries }: JournalViewProps) {
         </Dialog>
       </div>
 
+      {/* Search Bar */}
+      {entries.length > 0 && (
+        <div className="relative group">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground transition-colors group-focus-within:text-primary" />
+          <input
+            type="text"
+            placeholder="Search journal ticker..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full h-10 pl-10 pr-4 rounded-xl border border-border bg-card text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all shadow-sm"
+          />
+        </div>
+      )}
+
       {entries.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-12 px-4 text-center border border-dashed border-border rounded-xl">
           <div className="size-10 rounded-full bg-muted flex items-center justify-center mb-3">
@@ -110,7 +166,7 @@ export function JournalView({ entries }: JournalViewProps) {
         </div>
       ) : (
         <div className="flex flex-col gap-4 pb-8">
-          {entries.map((entry) => {
+          {filteredEntries.map((entry) => {
             const isProfit = entry.realized_pnl >= 0;
             return (
               <div
@@ -120,14 +176,31 @@ export function JournalView({ entries }: JournalViewProps) {
                 {/* Header Row */}
                 <div className="flex justify-between items-start">
                   <div>
-                    <h3 className="text-lg font-bold font-mono text-foreground leading-none">
+                    <h3 className="text-lg font-bold font-mono text-foreground leading-none flex items-center gap-2">
                       {entry.ticker}
+                      {entry.trade_type === "IPO" && (
+                        <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded font-bold uppercase tracking-tighter">
+                          IPO Flip
+                        </span>
+                      )}
                     </h3>
                     <p className="text-[10px] text-muted-foreground mt-1 tracking-wide">
                       {formatDate(entry.buy_date)} ➔ {formatDate(entry.sell_date)}
                     </p>
                   </div>
-                  <div className="flex items-start gap-4">
+                  <div className="flex items-start gap-2.5">
+                    <button
+                      onClick={() => {
+                        setEditedThesis(entry.initial_reasoning || "");
+                        setEditedReflection(entry.reflection || "");
+                        setIsEditing(true);
+                        setFocusedItemId(entry.id);
+                      }}
+                      title="Edit notes"
+                      className="text-muted-foreground hover:text-primary transition-colors p-1"
+                    >
+                      <Edit3 className="size-4" />
+                    </button>
                     <div className="text-right">
                       <p className="text-[10px] uppercase font-semibold text-muted-foreground tracking-widest">
                         Realized PnL
@@ -191,7 +264,14 @@ export function JournalView({ entries }: JournalViewProps) {
                 {(entry.initial_reasoning || entry.reflection) && (
                   <Dialog
                     open={focusedItemId === entry.id}
-                    onOpenChange={(open) => setFocusedItemId(open ? entry.id : null)}
+                    onOpenChange={(open) => {
+                      setFocusedItemId(open ? entry.id : null);
+                      if (open) {
+                        setEditedThesis(entry.initial_reasoning || "");
+                        setEditedReflection(entry.reflection || "");
+                        setIsEditing(false);
+                      }
+                    }}
                   >
                     <DialogTrigger
                       className="mt-2 border-t border-border/50 pt-3 text-left w-full cursor-pointer hover:opacity-80 transition-opacity"
@@ -240,30 +320,75 @@ export function JournalView({ entries }: JournalViewProps) {
                             {isProfit ? "+" : ""}{formatIDR(entry.realized_pnl)}
                           </span>
                         </DialogTitle>
+                        {isEditing && (
+                          <div className="flex items-center gap-3">
+                            <button
+                              onClick={() => handleSaveEdit(entry)}
+                              disabled={isSaving}
+                              className="flex items-center gap-1 text-[10px] font-bold text-profit hover:underline transition-all disabled:opacity-50"
+                            >
+                              {isSaving ? <Loader2 className="size-3 animate-spin" /> : <Save className="size-3" />}
+                              Save Changes
+                            </button>
+                            <button
+                              onClick={() => {
+                                setIsEditing(false);
+                                setEditedThesis(entry.initial_reasoning || "");
+                                setEditedReflection(entry.reflection || "");
+                              }}
+                              disabled={isSaving}
+                              className="flex items-center gap-1 text-[10px] font-bold text-muted-foreground hover:underline transition-all disabled:opacity-50"
+                            >
+                              <X className="size-3" /> Cancel
+                            </button>
+                          </div>
+                        )}
                       </DialogHeader>
 
                       <div className="space-y-5 py-2">
-                        {entry.initial_reasoning && (
-                          <div>
-                            <h4 className="flex items-center gap-1.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-widest mb-2">
-                              <Quote className="size-3" /> Initial Thesis
-                            </h4>
-                            <div className="bg-muted/20 p-3 rounded-lg border border-border/50 text-sm leading-relaxed whitespace-pre-wrap text-foreground/90 italic">
-                              {entry.initial_reasoning}
-                            </div>
-                          </div>
-                        )}
+                        <div>
+                          <h4 className="flex items-center gap-1.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-widest mb-2">
+                            <Quote className="size-3" /> Initial Thesis
+                          </h4>
+                          {isEditing ? (
+                            <textarea
+                              value={editedThesis}
+                              onChange={(e) => setEditedThesis(e.target.value)}
+                              className="w-full min-h-[100px] p-3 rounded-lg border border-primary/20 bg-muted/30 text-sm leading-relaxed focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all font-sans italic"
+                              placeholder="What was your initial plan for this trade?"
+                            />
+                          ) : (
+                            entry.initial_reasoning ? (
+                              <div className="bg-muted/20 p-3 rounded-lg border border-border/50 text-sm leading-relaxed whitespace-pre-wrap text-foreground/90 italic">
+                                {entry.initial_reasoning}
+                              </div>
+                            ) : (
+                              <p className="text-xs text-muted-foreground italic px-2">No initial thesis recorded.</p>
+                            )
+                          )}
+                        </div>
 
-                        {entry.reflection && (
-                          <div>
-                            <h4 className="flex items-center gap-1.5 text-[10px] font-semibold text-primary uppercase tracking-widest mb-2">
-                              <BookOpen className="size-3" /> Post-Trade Reflection
-                            </h4>
-                            <div className="bg-primary/5 p-3 rounded-lg border border-primary/20 text-sm leading-relaxed whitespace-pre-wrap text-foreground font-medium">
-                              {entry.reflection}
-                            </div>
-                          </div>
-                        )}
+                        <div>
+                          <h4 className="flex items-center gap-1.5 text-[10px] font-semibold text-primary uppercase tracking-widest mb-2">
+                            <BookOpen className="size-3" /> Post-Trade Reflection
+                          </h4>
+                          {isEditing ? (
+                            <textarea
+                              value={editedReflection}
+                              onChange={(e) => setEditedReflection(e.target.value)}
+                              className="w-full min-h-[120px] p-3 rounded-lg border border-primary/20 bg-muted/30 text-sm leading-relaxed focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all font-sans font-medium"
+                              placeholder="What went well? What could be improved?"
+                            />
+                          ) : (
+                            entry.reflection ? (
+                              <div className="bg-primary/5 p-3 rounded-lg border border-primary/20 text-sm leading-relaxed whitespace-pre-wrap text-foreground font-medium">
+                                {entry.reflection}
+                              </div>
+                            ) : (
+                              <p className="text-xs text-muted-foreground italic px-2">No post-trade reflection recorded.</p>
+                            )
+                          )}
+                        </div>
 
                         {entry.attachment_url && (
                           <div>

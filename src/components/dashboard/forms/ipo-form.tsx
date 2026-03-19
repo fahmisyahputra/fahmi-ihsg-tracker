@@ -25,6 +25,7 @@ const formSchema = z.object({
   ticker: z.string().min(1, "Ticker is required").max(10),
   lots_ordered: z.string().min(1, "Lots are required"),
   price_per_share: z.string().min(1, "Price is required"),
+  order_date: z.string().min(1, "Order date is required"),
   notes: z.string().optional(),
   attachment: z.any().optional(),
 });
@@ -42,6 +43,7 @@ export function IpoForm({ onSuccess }: IpoFormProps) {
       ticker: "",
       lots_ordered: "",
       price_per_share: "",
+      order_date: new Date().toISOString().split("T")[0],
       notes: "",
       attachment: undefined,
     },
@@ -96,13 +98,13 @@ export function IpoForm({ onSuccess }: IpoFormProps) {
           attachmentUrl = data.publicUrl;
         }
 
-        // Convert Lots to Shares internally
         const targetShares = rawLots * 100;
 
         await addIpoOrder({
           ticker: values.ticker,
           shares_ordered: targetShares,
           price_per_share: rawPrice,
+          order_date: values.order_date,
           notes: values.notes,
           attachment_url: attachmentUrl,
         });
@@ -200,6 +202,20 @@ export function IpoForm({ onSuccess }: IpoFormProps) {
             )}
           />
         </div>
+
+        <FormField
+          control={form.control}
+          name="order_date"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Order Date</FormLabel>
+              <FormControl>
+                <Input type="date" {...field} className="bg-background" />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
 
         <FormField
           control={form.control}

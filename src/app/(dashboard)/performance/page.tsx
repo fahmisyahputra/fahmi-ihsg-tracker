@@ -149,7 +149,7 @@ function AnalyticsDashboard({
       {/* Hero Metrics */}
       <div className="flex flex-col gap-1 px-1">
         <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-          {type === "all" ? "Total Equity Now" : `${type.toUpperCase()} Growth`}
+          {type === "all" ? "Total Return" : `${type.toUpperCase()} Return`}
         </p>
         <h2 className="text-3xl font-bold font-mono tracking-tight text-foreground">
           {formatIDR(metrics.totalEquity)}
@@ -186,11 +186,12 @@ function AnalyticsDashboard({
               </defs>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" opacity={0.3} />
               <XAxis
-                dataKey="month"
+                dataKey="label"
                 axisLine={false}
                 tickLine={false}
                 tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))", fontWeight: 600 }}
                 dy={10}
+                minTickGap={20}
               />
               <YAxis hide domain={["auto", "auto"]} />
               <Tooltip content={<CustomTooltip />} cursor={{ stroke: "hsl(var(--primary))", strokeWidth: 1, strokeDasharray: "4 4" }} />
@@ -202,6 +203,8 @@ function AnalyticsDashboard({
                 strokeWidth={2.5}
                 fillOpacity={1}
                 fill="url(#colorEquity)"
+                dot={{ r: 3, fill: "#10B981", strokeWidth: 0 }}
+                activeDot={{ r: 5, strokeWidth: 0 }}
               />
             </AreaChart>
           </ResponsiveContainer>
@@ -209,20 +212,35 @@ function AnalyticsDashboard({
       </div>
 
       {/* Return Matrix */}
-      <div className="flex flex-col gap-2 rounded-xl border border-border bg-card p-4 shadow-sm">
+      <div className="flex flex-col gap-2 rounded-xl border border-border bg-card p-4 shadow-sm relative overflow-hidden">
         <h2 className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
           <BarChart3 className="size-3.5 text-primary" /> Monthly Return Matrix
         </h2>
+        
+        {/* Empty State Overlay */}
+        {chartData.every(d => d.realizedPnL === 0 && d.ipoPnL === 0 && d.dividendYield === 0) && (
+          <div className="absolute inset-0 z-10 bg-card/60 backdrop-blur-[1px] flex flex-col items-center justify-center p-6 text-center">
+            <div className="bg-muted/50 p-3 rounded-full mb-3">
+              <BarChart3 className="size-6 text-muted-foreground opacity-50" />
+            </div>
+            <p className="text-xs font-bold text-foreground mb-1">No Activity Detected</p>
+            <p className="text-[10px] text-muted-foreground max-w-[200px] leading-relaxed">
+              Realized gains, IPO flips, and dividends will appear here once you close a position.
+            </p>
+          </div>
+        )}
+
         <div className="h-[250px] w-full mt-4 -ml-4">
           <ResponsiveContainer width="100%" height="100%">
             <RechartsBarChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" opacity={0.3} />
               <XAxis
-                dataKey="month"
+                dataKey="label"
                 axisLine={false}
                 tickLine={false}
                 tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))", fontWeight: 600 }}
                 dy={10}
+                minTickGap={20}
               />
               <YAxis hide />
               <Tooltip content={<CustomTooltip />} cursor={{ fill: "hsl(var(--muted))", opacity: 0.1 }} />

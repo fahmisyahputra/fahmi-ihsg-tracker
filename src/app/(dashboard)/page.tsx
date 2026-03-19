@@ -9,15 +9,12 @@ export const dynamic = "force-dynamic";
 export default async function HomePage() {
   const data = await getDashboardData();
 
-  // Extract first name from email for greeting
-  const name = data.userEmail.split("@")[0];
-
   return (
-    <div className="flex flex-col gap-4 animate-fade-in">
+    <div className="flex flex-col gap-5 animate-fade-in">
       {/* Greeting */}
-      <div>
+      <div className="space-y-1">
         <h1 className="text-lg font-bold text-foreground">
-          Hi, {name} 👋
+          Hi, {data.userDisplayName} 👋
         </h1>
         <p className="text-xs text-muted-foreground">
           Here&apos;s your portfolio overview
@@ -42,11 +39,16 @@ export default async function HomePage() {
           cashBalance={data.cashBalance}
           dailyPnl={data.dailyPnl}
           dailyPnlPercent={data.dailyPnlPercent}
+          ytdPnl={data.ytdPnl}
         />
       </Suspense>
 
       {/* Performance TWR vs IHSG */}
-      <PerformanceCard ytdTwr={data.ytdTwr} ihsgQuote={data.ihsgQuote} />
+      <PerformanceCard 
+        ytdTwr={data.ytdTwr} 
+        ihsgQuote={data.ihsgQuote} 
+        ihsgYtdReturn={data.ihsgYtdReturn} 
+      />
 
       {/* Top Positions */}
       <TopPositions holdings={data.holdings} />

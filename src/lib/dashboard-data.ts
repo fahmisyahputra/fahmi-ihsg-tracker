@@ -6,7 +6,7 @@
  */
 
 import { createClient } from "@/utils/supabase/server";
-import { getStockQuotes, getIndexQuote } from "@/lib/stock-api";
+import { getStockQuotes, getIndexQuote, getHistoricalPrice } from "@/lib/stock-api";
 import type { StockQuote } from "@/lib/stock-api";
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -26,14 +26,27 @@ export interface Holding {
   allocation: number; // percentage of total portfolio
 }
 
+export interface MutualFund {
+  id: string;
+  fund_name: string;
+  type: string;
+  invested_amount: number;
+  current_value: number;
+  last_updated: string;
+}
+
 export interface DashboardData {
   /** Cash balance derived from cash_flows sum */
   cashBalance: number;
   /** Active holdings with live prices */
   holdings: Holding[];
+  /** Manual mutual funds tracking */
+  mutualFunds: MutualFund[];
   /** Sum of all holdings at market value */
   portfolioValue: number;
-  /** Cash + portfolio market value */
+  /** Sum of all mutual funds current value */
+  mutualFundsValue: number;
+  /** Cash + portfolio market value + mutual funds */
   totalEquity: number;
   /** Sum of daily PnL across all holdings */
   dailyPnl: number;
@@ -43,8 +56,12 @@ export interface DashboardData {
   ytdTwr: number;
   /** IHSG (^JKSE) quote for comparison */
   ihsgQuote: StockQuote | null;
-  /** User's greeting name */
-  userEmail: string;
+  /** User's greeting name (from profile or email) */
+  userDisplayName: string;
+  /** Year-to-Date PnL (Realized + Unrealized + Dividends) */
+  ytdPnl: number;
+  /** IHSG YTD Return percentage */
+  ihsgYtdReturn: number;
 }
 
 // ── Data Fetching ──────────────────────────────────────────────────────────
@@ -61,20 +78,33 @@ export async function getDashboardData(): Promise<DashboardData> {
     return {
       cashBalance: 0,
       holdings: [],
+      mutualFunds: [],
       portfolioValue: 0,
+      mutualFundsValue: 0,
       totalEquity: 0,
       dailyPnl: 0,
       dailyPnlPercent: 0,
       ytdTwr: 0,
       ihsgQuote: null,
-      userEmail: "Guest",
+      userDisplayName: "Guest",
+      ytdPnl: 0,
+      ihsgYtdReturn: 0,
     };
   }
+
+  // 0. Fetch profile name
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("display_name")
+    .eq("id", user.id)
+    .single();
+
+  const userDisplayName = profile?.display_name || user.email?.split("@")[0] || "Investor";
 
   // 1. Fetch cash flows
   const { data: cashFlows } = await supabase
     .from("cash_flows")
-    .select("type, amount")
+    .select("type, amount, flow_date")
     .eq("user_id", user.id);
 
   let cashBalance = 0;
@@ -145,20 +175,13 @@ export async function getDashboardData(): Promise<DashboardData> {
 
   // 3. Fetch live quotes for active holdings + IHSG index
   const holdingTickers = activeHoldings.map((h) => h.ticker);
-  let quotesMap = new Map<string, StockQuote>();
-  let ihsgQuote: StockQuote | null = null;
-
-  try {
-    const promises: Promise<any>[] = [];
-    if (holdingTickers.length > 0) {
-      promises.push(getStockQuotes(holdingTickers).then((res) => (quotesMap = res)));
-    }
-    promises.push(getIndexQuote("^JKSE").then((res) => (ihsgQuote = res)).catch(() => null));
-
-    await Promise.all(promises);
-  } catch (error) {
-    console.error("Failed to fetch stock quotes:", error);
-  }
+  
+  const [quotesMap, ihsgQuote] = await Promise.all([
+    holdingTickers.length > 0 
+      ? getStockQuotes(holdingTickers) 
+      : Promise.resolve(new Map<string, StockQuote>()),
+    getIndexQuote("^JKSE").catch(() => null as StockQuote | null)
+  ]);
 
   // 4. Build final holdings with calculated fields
   const holdings: Holding[] = activeHoldings.map((h) => {
@@ -185,6 +208,23 @@ export async function getDashboardData(): Promise<DashboardData> {
     };
   });
 
+  // 2.5 Fetch Mutual Funds
+  const { data: mfData } = await supabase
+    .from("mutual_funds")
+    .select("*")
+    .eq("user_id", user.id);
+
+  const mutualFunds: MutualFund[] = (mfData || []).map(mf => ({
+    id: mf.id,
+    fund_name: mf.fund_name,
+    type: mf.type,
+    invested_amount: Number(mf.invested_amount),
+    current_value: Number(mf.current_value),
+    last_updated: mf.updated_at || mf.created_at,
+  }));
+
+  const mutualFundsValue = mutualFunds.reduce((sum, mf) => sum + mf.current_value, 0);
+
   // Calculate portfolio totals
   const portfolioValue = holdings.reduce((sum, h) => sum + h.marketValue, 0);
   
@@ -205,7 +245,7 @@ export async function getDashboardData(): Promise<DashboardData> {
     }
   }
 
-  const totalEquity = Math.max(0, cashBalance) + portfolioValue;
+  const totalEquity = Math.max(0, cashBalance) + portfolioValue + mutualFundsValue;
 
   // Set allocation percentages
   for (const h of holdings) {
@@ -224,15 +264,75 @@ export async function getDashboardData(): Promise<DashboardData> {
   const previousEquity = totalEquity - dailyPnl;
   const dailyPnlPercent = previousEquity > 0 ? (dailyPnl / previousEquity) * 100 : 0;
 
+  // Calculate YTD PnL: Realized PnL (from Journals) + Dividends + Current Unrealized PnL
+  const currentYearStart = new Date(new Date().getFullYear(), 0, 1).toISOString();
+  
+  const { data: ytdJournals } = await supabase
+    .from("journals")
+    .select("realized_pnl")
+    .eq("user_id", user.id)
+    .gte("sell_date", currentYearStart);
+
+  const realizedPnlYTD = (ytdJournals || []).reduce((sum, j) => sum + Number(j.realized_pnl), 0);
+
+  const { data: ytdDividends } = await supabase
+    .from("cash_flows")
+    .select("amount")
+    .eq("user_id", user.id)
+    .eq("type", "DIVIDEND")
+    .gte("flow_date", currentYearStart);
+
+  const dividendsYTD = (ytdDividends || []).reduce((sum, d) => sum + Number(d.amount), 0);
+  
+  const totalUnrealizedPnl = holdings.reduce((sum, h) => sum + h.unrealizedPnl, 0);
+  // Add mutual fund unrealized PnL as well
+  const mutualFundsUnrealizedPnl = mutualFunds.reduce((sum, mf) => sum + (mf.current_value - mf.invested_amount), 0);
+  const ytdPnl = realizedPnlYTD + dividendsYTD + totalUnrealizedPnl + mutualFundsUnrealizedPnl;
+
+  // 5. Calculate YTD TWR Fallback (Simple ROI)
+  // netCashFlowYTD = sum(TOPUP) - sum(WITHDRAWAL)
+  // startingEquityYTD = currentEquity - ytdPnl - netCashFlowYTD
+  let netCashFlowYTD = 0;
+  if (cashFlows) {
+    for (const cf of cashFlows) {
+      if (new Date(cf.flow_date) >= new Date(currentYearStart)) {
+        if (cf.type === "TOPUP") netCashFlowYTD += Number(cf.amount);
+        else if (cf.type === "WITHDRAWAL") netCashFlowYTD -= Number(cf.amount);
+      }
+    }
+  }
+
+  const startingEquityYTD = totalEquity - ytdPnl - netCashFlowYTD;
+  const ytdTwr = startingEquityYTD > 0 ? (ytdPnl / startingEquityYTD) * 100 : 0;
+
+  // 6. Calculate IHSG YTD Return
+  let ihsgYtdReturn = 0;
+  if (ihsgQuote) {
+    const currentIhsgPrice = ihsgQuote.regularMarketPrice;
+    try {
+      const jan1st = new Date(new Date().getFullYear(), 0, 1);
+      const startOfYearPrice = await getHistoricalPrice("^JKSE", jan1st);
+      if (startOfYearPrice > 0) {
+        ihsgYtdReturn = ((currentIhsgPrice - startOfYearPrice) / startOfYearPrice) * 100;
+      }
+    } catch (error) {
+      console.error("Failed to fetch IHSG start of year price:", error);
+    }
+  }
+
   return {
     cashBalance,
     holdings,
+    mutualFunds,
     portfolioValue,
+    mutualFundsValue,
     totalEquity,
     dailyPnl,
     dailyPnlPercent,
-    ytdTwr: 0, // Will be calculated when snapshots are populated
+    ytdTwr, 
     ihsgQuote,
-    userEmail: user.email ?? "Investor",
+    userDisplayName,
+    ytdPnl,
+    ihsgYtdReturn,
   };
 }

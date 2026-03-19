@@ -233,8 +233,10 @@ export function calculateTWR(
  * Positive values get a "+" prefix.
  */
 export function formatReturnPercent(value: number, decimals = 2): string {
-  const formatted = value.toFixed(decimals);
-  return value >= 0 ? `+${formatted}%` : `${formatted}%`;
+  const formatted = Math.abs(value).toFixed(decimals);
+  if (value > 0) return `+${formatted}%`;
+  if (value < 0) return `-${formatted}%`;
+  return `${formatted}%`;
 }
 
 /**

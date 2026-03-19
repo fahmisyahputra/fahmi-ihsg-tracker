@@ -19,7 +19,7 @@ interface NavItem {
 
 const NAV_ITEMS: NavItem[] = [
   { href: "/", label: "Home", icon: LayoutDashboard },
-  { href: "/stocks", label: "Stocks", icon: TrendingUp },
+  { href: "/stocks", label: "Portfolio", icon: TrendingUp },
   { href: "/ipo", label: "IPO", icon: Rocket },
   { href: "/journal", label: "Journal", icon: BookOpen },
   { href: "/performance", label: "Analytics", icon: BarChart3 },
