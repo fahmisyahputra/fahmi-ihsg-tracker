@@ -89,7 +89,7 @@ function DatePickerWithRange({
 }
 
 export default function CashHistoryPage() {
-  const [range, setRange] = useState("1M");
+  const [range, setRange] = useState("YTD");
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
   const [data, setData] = useState<CashStats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -179,14 +179,14 @@ export default function CashHistoryPage() {
           className={cn(
             "rounded-xl border p-3 shadow-sm flex flex-col gap-1 transition-all text-left",
             typeFilter === "IN" 
-              ? "bg-profit/5 border-profit ring-1 ring-profit/20 scale-[1.02]" 
-              : "border-border bg-card hover:border-profit/30"
+              ? "bg-emerald-50 border-emerald-500 ring-1 ring-emerald-500/20 scale-[1.02]" 
+              : "border-border bg-card hover:border-emerald-500/30"
           )}
         >
           <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1">
-            <ArrowUpRight className={cn("size-3", typeFilter === "IN" ? "text-profit" : "text-muted-foreground/50")} /> Total In
+            <ArrowUpRight className={cn("size-3", typeFilter === "IN" ? "text-emerald-500" : "text-muted-foreground/50")} /> Total In
           </p>
-          <p className={cn("text-sm font-bold font-mono tracking-tight truncate", typeFilter === "IN" ? "text-profit" : "text-foreground")}>
+          <p className={cn("text-sm font-bold font-mono tracking-tight truncate", typeFilter === "IN" ? "text-emerald-500" : "text-foreground")}>
             {formatIDR(data?.totalIn || 0)}
           </p>
         </button>
@@ -196,14 +196,14 @@ export default function CashHistoryPage() {
           className={cn(
             "rounded-xl border p-3 shadow-sm flex flex-col gap-1 transition-all text-left",
             typeFilter === "OUT" 
-              ? "bg-loss/5 border-loss ring-1 ring-loss/20 scale-[1.02]" 
-              : "border-border bg-card hover:border-loss/30"
+              ? "bg-rose-50 border-rose-500 ring-1 ring-rose-500/20 scale-[1.02]" 
+              : "border-border bg-card hover:border-rose-500/30"
           )}
         >
           <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1">
-            <ArrowDownLeft className={cn("size-3", typeFilter === "OUT" ? "text-loss" : "text-muted-foreground/50")} /> Total Out
+            <ArrowDownLeft className={cn("size-3", typeFilter === "OUT" ? "text-rose-500" : "text-muted-foreground/50")} /> Total Out
           </p>
-          <p className={cn("text-sm font-bold font-mono tracking-tight truncate", typeFilter === "OUT" ? "text-loss" : "text-foreground")}>
+          <p className={cn("text-sm font-bold font-mono tracking-tight truncate", typeFilter === "OUT" ? "text-rose-500" : "text-foreground")}>
             {formatIDR(data?.totalOut || 0)}
           </p>
         </button>
