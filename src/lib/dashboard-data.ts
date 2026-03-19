@@ -62,6 +62,8 @@ export interface DashboardData {
   ytdPnl: number;
   /** IHSG YTD Return percentage */
   ihsgYtdReturn: number;
+  /** ISO timestamp of when the data was fetched */
+  lastUpdated: string;
 }
 
 // ── Data Fetching ──────────────────────────────────────────────────────────
@@ -89,8 +91,11 @@ export async function getDashboardData(): Promise<DashboardData> {
       userDisplayName: "Guest",
       ytdPnl: 0,
       ihsgYtdReturn: 0,
+      lastUpdated: new Date().toISOString(),
     };
   }
+
+  const fetchTime = new Date().toISOString();
 
   // 0. Fetch profile name
   const { data: profile } = await supabase
@@ -334,5 +339,6 @@ export async function getDashboardData(): Promise<DashboardData> {
     userDisplayName,
     ytdPnl,
     ihsgYtdReturn,
+    lastUpdated: fetchTime,
   };
 }

@@ -3,6 +3,7 @@ import { getDashboardData } from "@/lib/dashboard-data";
 import { MetricCards } from "@/components/dashboard/metric-cards";
 import { PerformanceCard } from "@/components/dashboard/performance-card";
 import { TopPositions } from "@/components/dashboard/top-positions";
+import { LastUpdated } from "@/components/dashboard/last-updated";
 
 export const dynamic = "force-dynamic";
 
@@ -16,9 +17,7 @@ export default async function HomePage() {
         <h1 className="text-lg font-bold text-foreground">
           Hi, {data.userDisplayName} 👋
         </h1>
-        <p className="text-xs text-muted-foreground">
-          Here&apos;s your portfolio overview
-        </p>
+        <LastUpdated isoTimestamp={data.lastUpdated} />
       </div>
 
       {/* Metric Cards */}
