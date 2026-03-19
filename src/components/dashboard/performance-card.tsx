@@ -21,82 +21,82 @@ export function PerformanceCard({ ytdTwr, ihsgQuote, ihsgYtdReturn }: Performanc
         </h2>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-3 gap-y-4 gap-x-2">
+      <div className="grid grid-cols-3 gap-1 w-full">
         {/* Your YTD TWR */}
-        <div>
-          <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+        <div className="flex flex-col items-center text-center">
+          <p className="text-[10px] font-medium uppercase tracking-tight text-muted-foreground whitespace-nowrap">
             Your YTD TWR
           </p>
-          <div className="mt-1 flex items-center gap-1">
+          <div className="mt-1 flex items-center justify-center gap-1">
             {ytdTwr > 0 ? (
-              <ArrowUpRight className="size-4 text-profit" />
+              <ArrowUpRight className="size-3.5 text-profit" />
             ) : ytdTwr < 0 ? (
-              <ArrowDownRight className="size-4 text-loss" />
+              <ArrowDownRight className="size-3.5 text-loss" />
             ) : (
-              <Activity className="size-4 text-muted-foreground/50" />
+              <Activity className="size-3.5 text-muted-foreground/50" />
             )}
             <span
               className={cn(
-                "text-xl font-bold font-mono tracking-tight",
+                "text-base font-bold font-mono tracking-tighter",
                 ytdTwr > 0 ? "text-profit" : ytdTwr < 0 ? "text-loss" : "text-muted-foreground"
               )}
             >
               {formatReturnPercent(ytdTwr)}
             </span>
           </div>
-          <p className="mt-0.5 text-[10px] text-muted-foreground">
+          <p className="mt-0.5 text-[9px] text-zinc-400 font-medium">
             Portfolio
           </p>
         </div>
 
         {/* IHSG Today */}
-        <div>
-          <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+        <div className="flex flex-col items-center text-center">
+          <p className="text-[10px] font-medium uppercase tracking-tight text-muted-foreground whitespace-nowrap">
             IHSG Today
           </p>
-          <div className="mt-1 flex items-center gap-1">
+          <div className="mt-1 flex items-center justify-center gap-1">
             {ihsgChange >= 0 ? (
-              <ArrowUpRight className="size-4 text-profit" />
+              <ArrowUpRight className="size-3.5 text-profit" />
             ) : (
-              <ArrowDownRight className="size-4 text-loss" />
+              <ArrowDownRight className="size-3.5 text-loss" />
             )}
             <span
               className={cn(
-                "text-xl font-bold font-mono tracking-tight",
+                "text-base font-bold font-mono tracking-tighter",
                 ihsgChange >= 0 ? "text-profit" : "text-loss"
               )}
             >
               {formatReturnPercent(ihsgChange)}
             </span>
           </div>
-          <p className="mt-0.5 text-[10px] text-muted-foreground">
+          <p className="mt-0.5 text-[9px] text-zinc-400 font-medium whitespace-nowrap">
             {ihsgQuote
               ? `${ihsgQuote.regularMarketPrice.toLocaleString("id-ID")} pts`
-              : "Loading..."}
+              : "..."}
           </p>
         </div>
 
         {/* IHSG YTD */}
-        <div className="col-span-2 lg:col-span-1 pt-2 lg:pt-0 border-t border-border/50 lg:border-t-0">
-          <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+        <div className="flex flex-col items-center text-center">
+          <p className="text-[10px] font-medium uppercase tracking-tight text-muted-foreground whitespace-nowrap">
             IHSG YTD
           </p>
-          <div className="mt-1 flex items-center gap-1">
+          <div className="mt-1 flex items-center justify-center gap-1">
             {ihsgYtdReturn >= 0 ? (
-              <ArrowUpRight className="size-4 text-profit" />
+              <ArrowUpRight className="size-3.5 text-profit" />
             ) : (
-              <ArrowDownRight className="size-4 text-loss" />
+              <ArrowDownRight className="size-3.5 text-loss" />
             )}
             <span
               className={cn(
-                "text-xl font-bold font-mono tracking-tight",
+                "text-base font-bold font-mono tracking-tighter",
                 ihsgYtdReturn >= 0 ? "text-profit" : "text-loss"
               )}
             >
               {formatReturnPercent(ihsgYtdReturn)}
             </span>
           </div>
-          <p className="mt-0.5 text-[10px] text-muted-foreground">
+          <p className="mt-0.5 text-[9px] text-zinc-400 font-medium whitespace-nowrap">
             Market Benchmark
           </p>
         </div>
