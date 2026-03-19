@@ -184,9 +184,9 @@ export default function CashHistoryPage() {
           )}
         >
           <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1">
-            <ArrowUpRight className={cn("size-3", typeFilter === "IN" ? "text-emerald-500" : "text-muted-foreground/50")} /> Total In
+            <ArrowUpRight className="size-3 text-emerald-500" /> Total In
           </p>
-          <p className={cn("text-sm font-bold font-mono tracking-tight truncate", typeFilter === "IN" ? "text-emerald-500" : "text-foreground")}>
+          <p className="text-sm font-bold font-mono tracking-tight truncate text-emerald-500">
             {formatIDR(data?.totalIn || 0)}
           </p>
         </button>
@@ -201,9 +201,9 @@ export default function CashHistoryPage() {
           )}
         >
           <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1">
-            <ArrowDownLeft className={cn("size-3", typeFilter === "OUT" ? "text-rose-500" : "text-muted-foreground/50")} /> Total Out
+            <ArrowDownLeft className="size-3 text-rose-500" /> Total Out
           </p>
-          <p className={cn("text-sm font-bold font-mono tracking-tight truncate", typeFilter === "OUT" ? "text-rose-500" : "text-foreground")}>
+          <p className="text-sm font-bold font-mono tracking-tight truncate text-rose-500">
             {formatIDR(data?.totalOut || 0)}
           </p>
         </button>
