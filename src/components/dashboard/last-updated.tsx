@@ -9,26 +9,33 @@ interface LastUpdatedProps {
 }
 
 export function LastUpdated({ isoTimestamp, isMarketTime }: LastUpdatedProps) {
-  const [formattedTime, setFormattedTime] = useState<string>("");
+  const [formattedDateTime, setFormattedDateTime] = useState<string>("");
 
   useEffect(() => {
     const date = new Date(isoTimestamp);
-    setFormattedTime(
-      date.toLocaleTimeString("en-GB", {
-        hour: "2-digit",
-        minute: "2-digit",
-        second: "2-digit",
-        hour12: false,
-      })
-    );
+    
+    // Format: "20 Mar, 16:14:50"
+    const datePart = date.toLocaleDateString("en-GB", {
+      day: "2-digit",
+      month: "short",
+    });
+    
+    const timePart = date.toLocaleTimeString("en-GB", {
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: false,
+    });
+
+    setFormattedDateTime(`${datePart}, ${timePart}`);
   }, [isoTimestamp]);
 
-  if (!formattedTime) return null;
+  if (!formattedDateTime) return null;
 
   return (
     <div className="flex items-center gap-1.5 text-[11px] text-zinc-400">
       <span>
-        {isMarketTime ? "Market data as of" : "Updated at"} {formattedTime}
+        {isMarketTime ? "Market data as of" : "Updated at"} {formattedDateTime}
         {!isMarketTime && " (Delayed ~15m)"}
       </span>
       <RefreshCcw 
