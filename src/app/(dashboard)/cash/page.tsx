@@ -193,84 +193,78 @@ export default function CashHistoryPage() {
         )}
       </div>
 
-      {/* Mutations Table (Stacked for Mobile) */}
+      {/* Mutations List (Optimized for Mobile/Fluid) */}
       <div className={cn(
         "rounded-xl border border-border bg-card overflow-hidden shadow-sm transition-opacity duration-300",
         loading && "opacity-50 pointer-events-none"
       )}>
-        <Table>
-          <TableHeader className="bg-muted/50">
-            <TableRow className="hover:bg-transparent border-border">
-              <TableHead className="h-9 text-[10px] font-bold uppercase tracking-widest px-3">Date & Description</TableHead>
-              <TableHead className="h-9 text-[10px] font-bold uppercase tracking-widest px-3 text-center">Badges</TableHead>
-              <TableHead className="h-9 text-[10px] font-bold uppercase tracking-widest text-right px-3 whitespace-nowrap">Amount (Rp)</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {loading ? (
-              <TableRow>
-                <TableCell colSpan={3} className="h-48 text-center px-6">
-                  <div className="flex flex-col items-center justify-center gap-3">
-                    <Loader2 className="size-8 text-primary animate-spin" />
-                    <div className="space-y-1">
-                       <p className="text-xs text-foreground font-bold uppercase tracking-wider">Retrieving Statement</p>
-                       <p className="text-[10px] text-muted-foreground italic">Fetching historical capital movements...</p>
-                    </div>
+        {/* Table Header Replacement */}
+        <div className="bg-muted/50 border-b border-border px-4 py-2 flex justify-between items-center">
+          <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Transaction Details</span>
+          <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Amount (Rp)</span>
+        </div>
+
+        <div className="flex flex-col">
+          {loading ? (
+            <div className="flex flex-col items-center justify-center gap-3 py-16 px-6">
+              <Loader2 className="size-8 text-primary animate-spin" />
+              <div className="text-center">
+                <p className="text-xs text-foreground font-bold uppercase tracking-wider">Retrieving Statement</p>
+                <p className="text-[10px] text-muted-foreground italic mt-0.5">Fetching historical capital movements...</p>
+              </div>
+            </div>
+          ) : data?.mutations.length && data.mutations.length > 0 ? (
+            data.mutations.map((m) => (
+              <div 
+                key={m.id} 
+                className="flex items-center justify-between gap-4 px-4 py-3 border-b border-border/50 last:border-0 hover:bg-muted/10 transition-colors"
+              >
+                {/* Left Section: Date, Description, Badge */}
+                <div className="flex flex-col gap-1 min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-[10px] font-bold text-muted-foreground uppercase tracking-tight">
+                      {format(new Date(m.flow_date), "dd MMM yyyy")}
+                    </span>
+                    
+                    {/* Compact Badge Integration */}
+                    {m.type === "TOPUP" && (
+                      <span className="px-1.5 py-0.5 rounded-full bg-profit/10 text-profit text-[7px] font-extrabold uppercase tracking-tight border border-profit/20">
+                        Top-Up
+                      </span>
+                    )}
+                    {m.type === "DIVIDEND" && (
+                      <span className="px-1.5 py-0.5 rounded-full bg-blue-500/10 text-blue-500 text-[7px] font-extrabold uppercase tracking-tight border border-blue-500/20">
+                        Dividend
+                      </span>
+                    )}
+                    {m.type === "WITHDRAWAL" && (
+                      <span className="px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground text-[7px] font-extrabold uppercase tracking-tight border border-border">
+                        Withdrawal
+                      </span>
+                    )}
                   </div>
-                </TableCell>
-              </TableRow>
-            ) : data?.mutations.length && data.mutations.length > 0 ? (
-              data.mutations.map((m) => (
-                <TableRow key={m.id} className="border-border hover:bg-muted/20">
-                  <TableCell className="py-3 px-3 min-w-[140px]">
-                    <div className="flex flex-col gap-0.5">
-                      <span className="font-mono text-[10px] font-bold text-muted-foreground uppercase tracking-tight">
-                        {format(new Date(m.flow_date), "dd MMM yyyy")}
-                      </span>
-                      <span className="text-xs font-semibold text-foreground line-clamp-1 leading-tight">
-                        {m.description || getDefaultDescription(m.type)}
-                      </span>
-                    </div>
-                  </TableCell>
-                  <TableCell className="py-3 px-3">
-                    <div className="flex justify-center">
-                      {m.type === "TOPUP" && (
-                        <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-profit/10 text-profit text-[8px] font-extrabold uppercase tracking-tight whitespace-nowrap border border-profit/20">
-                          Top-Up
-                        </div>
-                      )}
-                      {m.type === "DIVIDEND" && (
-                        <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-blue-500/10 text-blue-500 text-[8px] font-extrabold uppercase tracking-tight whitespace-nowrap border border-blue-500/20">
-                          Dividend
-                        </div>
-                      )}
-                      {m.type === "WITHDRAWAL" && (
-                        <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground text-[8px] font-extrabold uppercase tracking-tight whitespace-nowrap border border-border">
-                          Withdrawal
-                        </div>
-                      )}
-                    </div>
-                  </TableCell>
-                  <TableCell className={cn(
-                    "py-3 px-3 text-right font-mono text-[12px] font-bold tabular-nums whitespace-nowrap",
-                    m.type === "WITHDRAWAL" ? "text-loss" : "text-profit"
-                  )}>
-                    {m.type === "WITHDRAWAL" ? "-" : "+"}{formatIDR(m.amount)}
-                  </TableCell>
-                </TableRow>
-              ))
-            ) : (
-              <TableRow>
-                <TableCell colSpan={3} className="h-32 text-center text-xs text-muted-foreground italic py-10">
-                   <div className="flex flex-col items-center gap-2">
-                     <History className="size-8 opacity-20" />
-                     <p>No transactions found for this period.</p>
-                   </div>
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
+                  
+                  <span className="text-xs font-semibold text-foreground leading-snug whitespace-normal break-words">
+                    {m.description || getDefaultDescription(m.type)}
+                  </span>
+                </div>
+
+                {/* Right Section: Amount */}
+                <div className={cn(
+                  "text-right font-mono text-xs font-bold tabular-nums whitespace-nowrap flex-shrink-0 self-start mt-0.5",
+                  m.type === "WITHDRAWAL" ? "text-loss" : "text-profit"
+                )}>
+                  {m.type === "WITHDRAWAL" ? "-" : "+"}{formatIDR(m.amount)}
+                </div>
+              </div>
+            ))
+          ) : (
+            <div className="flex flex-col items-center justify-center gap-2 py-16 px-4 text-center">
+              <History className="size-8 opacity-20 text-muted-foreground" />
+              <p className="text-xs text-muted-foreground italic">No transactions found for this period.</p>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
