@@ -17,7 +17,7 @@ export default async function HomePage() {
         <h1 className="text-lg font-bold text-foreground">
           Hi, {data.userDisplayName} 👋
         </h1>
-        <LastUpdated isoTimestamp={data.lastUpdated} />
+        <LastUpdated isoTimestamp={data.lastUpdated} isMarketTime={data.isMarketTime} />
       </div>
 
       {/* Metric Cards */}

@@ -62,8 +62,10 @@ export interface DashboardData {
   ytdPnl: number;
   /** IHSG YTD Return percentage */
   ihsgYtdReturn: number;
-  /** ISO timestamp of when the data was fetched */
+  /** ISO timestamp of when the data was fetched or market time */
   lastUpdated: string;
+  /** Whether lastUpdated represents actual market time (true) or fetch time fallback (false) */
+  isMarketTime: boolean;
 }
 
 // ── Data Fetching ──────────────────────────────────────────────────────────
@@ -92,6 +94,7 @@ export async function getDashboardData(): Promise<DashboardData> {
       ytdPnl: 0,
       ihsgYtdReturn: 0,
       lastUpdated: new Date().toISOString(),
+      isMarketTime: false,
     };
   }
 
@@ -306,7 +309,6 @@ export async function getDashboardData(): Promise<DashboardData> {
       }
     }
   }
-
   const startingEquityYTD = totalEquity - ytdPnl - netCashFlowYTD;
   const ytdTwr = startingEquityYTD > 0 ? (ytdPnl / startingEquityYTD) * 100 : 0;
 
@@ -325,6 +327,26 @@ export async function getDashboardData(): Promise<DashboardData> {
     }
   }
 
+  // 7. Find latest market timestamp from quotes
+  let latestMarketTime: number | null = null;
+  
+  if (ihsgQuote?.regularMarketTime) {
+    latestMarketTime = ihsgQuote.regularMarketTime;
+  }
+  
+  for (const h of holdings) {
+    if (h.quote?.regularMarketTime) {
+      if (latestMarketTime === null || h.quote.regularMarketTime > latestMarketTime) {
+        latestMarketTime = h.quote.regularMarketTime;
+      }
+    }
+  }
+
+  const isMarketTime = latestMarketTime !== null;
+  const lastUpdated = latestMarketTime !== null 
+    ? new Date(latestMarketTime * 1000).toISOString() 
+    : fetchTime;
+
   return {
     cashBalance,
     holdings,
@@ -339,6 +361,7 @@ export async function getDashboardData(): Promise<DashboardData> {
     userDisplayName,
     ytdPnl,
     ihsgYtdReturn,
-    lastUpdated: fetchTime,
+    lastUpdated,
+    isMarketTime,
   };
 }

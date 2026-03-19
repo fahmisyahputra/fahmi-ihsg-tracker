@@ -20,6 +20,7 @@ export interface StockQuote {
   regularMarketPreviousClose: number;
   currency: string;
   marketState: string;
+  regularMarketTime: number | null;
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -51,6 +52,7 @@ export async function getIndexQuote(symbol: string): Promise<StockQuote> {
       "regularMarketPreviousClose",
       "currency",
       "marketState",
+      "regularMarketTime",
     ],
   });
 
@@ -63,6 +65,9 @@ export async function getIndexQuote(symbol: string): Promise<StockQuote> {
     regularMarketPreviousClose: quote.regularMarketPreviousClose ?? 0,
     currency: quote.currency ?? "IDR",
     marketState: quote.marketState ?? "CLOSED",
+    regularMarketTime: quote.regularMarketTime instanceof Date 
+      ? Math.floor(quote.regularMarketTime.getTime() / 1000) 
+      : (typeof quote.regularMarketTime === 'number' ? quote.regularMarketTime : null),
   };
 }
 
@@ -87,6 +92,7 @@ export async function getStockQuote(ticker: string): Promise<StockQuote> {
       "regularMarketPreviousClose",
       "currency",
       "marketState",
+      "regularMarketTime",
     ],
   });
 
@@ -99,6 +105,9 @@ export async function getStockQuote(ticker: string): Promise<StockQuote> {
     regularMarketPreviousClose: quote.regularMarketPreviousClose ?? 0,
     currency: quote.currency ?? "IDR",
     marketState: quote.marketState ?? "CLOSED",
+    regularMarketTime: quote.regularMarketTime instanceof Date 
+      ? Math.floor(quote.regularMarketTime.getTime() / 1000) 
+      : (typeof quote.regularMarketTime === 'number' ? quote.regularMarketTime : null),
   };
 }
 
@@ -142,6 +151,9 @@ export async function getStockQuotes(
       regularMarketPreviousClose: q.regularMarketPreviousClose ?? 0,
       currency: q.currency ?? "IDR",
       marketState: q.marketState ?? "CLOSED",
+      regularMarketTime: q.regularMarketTime instanceof Date 
+        ? Math.floor(q.regularMarketTime.getTime() / 1000) 
+        : (typeof q.regularMarketTime === 'number' ? q.regularMarketTime : null),
     });
   }
 

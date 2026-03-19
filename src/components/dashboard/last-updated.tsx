@@ -5,9 +5,10 @@ import { RefreshCcw } from "lucide-react";
 
 interface LastUpdatedProps {
   isoTimestamp: string;
+  isMarketTime: boolean;
 }
 
-export function LastUpdated({ isoTimestamp }: LastUpdatedProps) {
+export function LastUpdated({ isoTimestamp, isMarketTime }: LastUpdatedProps) {
   const [formattedTime, setFormattedTime] = useState<string>("");
 
   useEffect(() => {
@@ -26,8 +27,14 @@ export function LastUpdated({ isoTimestamp }: LastUpdatedProps) {
 
   return (
     <div className="flex items-center gap-1.5 text-[11px] text-zinc-400">
-      <span>Last updated at {formattedTime}</span>
-      <RefreshCcw className="w-3 h-3 cursor-pointer hover:text-zinc-300 transition-colors" onClick={() => window.location.reload()} />
+      <span>
+        {isMarketTime ? "Market data as of" : "Updated at"} {formattedTime}
+        {!isMarketTime && " (Delayed ~15m)"}
+      </span>
+      <RefreshCcw 
+        className="w-3 h-3 cursor-pointer hover:text-zinc-300 transition-colors" 
+        onClick={() => window.location.reload()} 
+      />
     </div>
   );
 }
