@@ -5,6 +5,9 @@
 import { createClient } from "@/utils/supabase/server";
 import { getDashboardData } from "@/lib/dashboard-data";
 import { startOfMonth, format, startOfYear, subDays, differenceInDays } from "date-fns";
+import { xirr } from "./xirr";
+
+export const revalidate = 0;
 
 export interface TimelineData {
   label: string;
@@ -18,6 +21,7 @@ export interface PerformanceStats {
   totalEquity: number;
   nominalGrowth: number;
   percentGrowth: number;
+  xirr: number;
   monthlyData: TimelineData[]; // Keeping name for compatibility, but content is dynamic
   topMovers: { ticker: string; pnl: number; pnlPercent: number }[];
 }
@@ -35,6 +39,7 @@ export async function getPerformanceData(filters: {
       totalEquity: 0,
       nominalGrowth: 0,
       percentGrowth: 0,
+      xirr: 0,
       monthlyData: [],
       topMovers: [],
     };
@@ -79,11 +84,9 @@ export async function getPerformanceData(filters: {
       .lte("sell_date", endDate.toISOString()),
     supabase
       .from("cash_flows")
-      .select("flow_date, amount")
+      .select("flow_date, amount, type")
       .eq("user_id", user.id)
-      .eq("type", "DIVIDEND")
-      .gte("flow_date", startDate.toISOString())
-      .lte("flow_date", endDate.toISOString()),
+      .order("flow_date", { ascending: true }),
     supabase
       .from("portfolio_snapshots")
       .select("snapshot_date, total_equity")
@@ -94,8 +97,12 @@ export async function getPerformanceData(filters: {
   ]);
 
   const journals = journalsRes.data;
-  const dividends = dividendsRes.data;
+  const cashFlows = dividendsRes.data; // Renamed for clarity as it now fetches all types
   const snapshots = snapshotsRes.data;
+
+  // 4b. Filter dividends for timeline (internal compatibility)
+  const dividends = cashFlows?.filter(cf => cf.type === "DIVIDEND" && 
+    new Date(cf.flow_date) >= startDate && new Date(cf.flow_date) <= endDate) || [];
 
   // 5. Aggregate Top Movers
   const moversMap = new Map<string, { pnl: number; cost: number }>();
@@ -151,25 +158,58 @@ export async function getPerformanceData(filters: {
     .sort((a, b) => a[0].localeCompare(b[0]))
     .map(([_, data]) => data);
 
-  // Growth Calculation using snapshots (Actual delta)
-  // Get starting equity from first available snapshot on or before start date
-  const { data: startSnapshot } = await supabase
+  // 7. Growth Calculation (Actual delta using Jan 1 Snapshot)
+  const currentYearStart = startOfYear(new Date()).toISOString();
+  
+  const { data: ytdStartSnapshot } = await supabase
     .from("portfolio_snapshots")
     .select("total_equity")
     .eq("user_id", user.id)
-    .lte("snapshot_date", startDate.toISOString().split("T")[0])
-    .order("snapshot_date", { ascending: false })
+    .gte("created_at", currentYearStart)
+    .order("created_at", { ascending: true })
     .limit(1)
-    .single();
+    .maybeSingle();
 
-  const startEquityVal = startSnapshot ? Number(startSnapshot.total_equity) : (snapshots && snapshots.length > 0 ? Number(snapshots[0].total_equity) : totalEquity);
+  const startEquityVal = ytdStartSnapshot ? Number(ytdStartSnapshot.total_equity) : totalEquity;
   const nominalGrowth = totalEquity - startEquityVal;
   const percentGrowth = startEquityVal > 0 ? (nominalGrowth / startEquityVal) * 100 : 0;
+
+  // 8. XIRR Calculation
+  let calculatedXirr = 0;
+  if (cashFlows) {
+    // Filter to YTD cash flows
+    const ytdCashFlows = cashFlows.filter(cf => new Date(cf.flow_date) >= new Date(currentYearStart));
+    
+    const xirrFlows = [];
+    
+    // Initial investment (Starting balance)
+    xirrFlows.push({
+      date: new Date(currentYearStart),
+      amount: -startEquityVal
+    });
+
+    // YTD transactions
+    ytdCashFlows.forEach(cf => {
+      xirrFlows.push({
+        date: new Date(cf.flow_date),
+        amount: cf.type === "TOPUP" ? -Number(cf.amount) : Number(cf.amount)
+      });
+    });
+
+    // Final Liquidation (Total Equity Now)
+    xirrFlows.push({
+      date: new Date(),
+      amount: totalEquity
+    });
+
+    calculatedXirr = xirr(xirrFlows) * 100; // Return as percentage
+  }
 
   return {
     totalEquity,
     nominalGrowth,
     percentGrowth: Number(percentGrowth.toFixed(2)),
+    xirr: Number(calculatedXirr.toFixed(2)),
     monthlyData: sortedHistory,
     topMovers,
   };

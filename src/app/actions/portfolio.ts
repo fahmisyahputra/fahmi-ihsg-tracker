@@ -78,5 +78,55 @@ export async function addTransaction(data: {
     throw new Error(error.message);
   }
 
+  // ── Smart Auto-Journal Integration (Context-Aware) ──────────────────────
+  // Sync to Journal after transaction success. Ensure constraints are handled.
+  try {
+    if (data.type === "BUY") {
+      const { error: journalError } = await supabase.from('journals').insert({
+        user_id: user.id,
+        ticker: cleanTicker,
+        buy_date: data.transaction_date,
+        buy_price: data.price,
+        lots: data.lots,
+        fee_buy: data.fee,
+        initial_reasoning: '-',
+        reflection: '-',
+        trade_type: 'REGULAR'
+      });
+      if (journalError) {
+        console.error("FATAL JOURNAL ERROR (INSERT):", journalError);
+      }
+    } else if (data.type === "SELL") {
+      // Find the active (unsold) journal for this ticker: sell_price IS NULL
+      const { data: openJournal, error: findError } = await supabase.from('journals')
+        .select('id')
+        .eq('ticker', cleanTicker)
+        .eq('user_id', user.id)
+        .is('sell_price', null)
+        .order('buy_date', { ascending: true })
+        .limit(1)
+        .single();
+
+      if (findError) {
+        console.error("JOURNAL SYNC: No open position found forTicker", cleanTicker, findError);
+      }
+
+      if (openJournal) {
+        const { error: updateError } = await supabase.from('journals').update({
+          sell_date: data.transaction_date,
+          sell_price: data.price,
+          fee_sell: data.fee
+        }).eq('id', openJournal.id);
+
+        if (updateError) {
+          console.error("FATAL JOURNAL ERROR (UPDATE):", updateError);
+        }
+      }
+    }
+  } catch (journalError) {
+    console.error("UNEXPECTED JOURNAL SYNC FAILURE:", journalError);
+  }
+
   revalidatePath("/", "layout");
+  revalidatePath("/journal");
 }

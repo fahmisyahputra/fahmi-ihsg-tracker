@@ -32,7 +32,8 @@ async function getJournalData() {
       "id, ticker, buy_date, sell_date, buy_price, sell_price, lots, initial_reasoning, reflection, realized_pnl, trade_type, attachment_url"
     )
     .eq("user_id", user.id)
-    .order("sell_date", { ascending: false });
+    .order("sell_date", { ascending: false })
+    .order("buy_date", { ascending: false });
 
   return {
     watchlist: (watchlist as WatchlistItem[]) || [],

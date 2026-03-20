@@ -44,13 +44,13 @@ export interface JournalEntry {
   id: string;
   ticker: string;
   buy_date: string;
-  sell_date: string;
+  sell_date: string | null;
   buy_price: number;
-  sell_price: number;
+  sell_price: number | null;
   lots: number;
   initial_reasoning: string | null;
   reflection: string | null;
-  realized_pnl: number;
+  realized_pnl: number | null;
   trade_type?: "REGULAR" | "IPO";
   attachment_url?: string;
 }
@@ -112,7 +112,8 @@ export function JournalView({ entries }: JournalViewProps) {
     entry.ticker.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const formatDate = (isoString: string) => {
+  const formatDate = (isoString: string | null) => {
+    if (!isoString) return "Open";
     return new Date(isoString).toLocaleDateString("id-ID", {
       day: "2-digit",
       month: "short",
@@ -167,7 +168,7 @@ export function JournalView({ entries }: JournalViewProps) {
       ) : (
         <div className="flex flex-col gap-4 pb-8">
           {filteredEntries.map((entry) => {
-            const isProfit = entry.realized_pnl >= 0;
+            const isProfit = (entry.realized_pnl ?? 0) >= 0;
             return (
               <div
                 key={entry.id}
@@ -185,7 +186,7 @@ export function JournalView({ entries }: JournalViewProps) {
                       )}
                     </h3>
                     <p className="text-[10px] text-muted-foreground mt-1 tracking-wide">
-                      {formatDate(entry.buy_date)} ➔ {formatDate(entry.sell_date)}
+                      {formatDate(entry.buy_date)} ➔ {entry.sell_date ? formatDate(entry.sell_date) : "Active Position"}
                     </p>
                   </div>
                   <div className="flex items-start gap-2.5">
@@ -208,11 +209,17 @@ export function JournalView({ entries }: JournalViewProps) {
                       <p
                         className={cn(
                           "font-mono font-bold mt-0.5 text-sm",
-                          isProfit ? "text-profit" : "text-loss"
+                          entry.realized_pnl === null ? "text-muted-foreground" : (isProfit ? "text-profit" : "text-loss")
                         )}
                       >
-                        {isProfit ? "+" : ""}
-                        {formatIDR(entry.realized_pnl)}
+                        {entry.realized_pnl !== null ? (
+                          <>
+                            {isProfit ? "+" : ""}
+                            {formatIDR(entry.realized_pnl)}
+                          </>
+                        ) : (
+                          "Running..."
+                        )}
                       </p>
                     </div>
 
@@ -250,9 +257,9 @@ export function JournalView({ entries }: JournalViewProps) {
                     <span className="text-muted-foreground text-[10px] tracking-widest uppercase">Buy Avg</span>
                     <span className="font-semibold">{formatIDR(entry.buy_price)}</span>
                   </div>
-                  <div className="flex flex-col font-mono">
+                  <div className="flex flex-col font-mono text-center md:text-left">
                     <span className="text-muted-foreground text-[10px] tracking-widest uppercase">Sell Avg</span>
-                    <span className="font-semibold">{formatIDR(entry.sell_price)}</span>
+                    <span className="font-semibold">{entry.sell_price ? formatIDR(entry.sell_price) : "—"}</span>
                   </div>
                   <div className="flex flex-col font-mono">
                     <span className="text-muted-foreground text-[10px] tracking-widest uppercase">Lots</span>
@@ -315,9 +322,15 @@ export function JournalView({ entries }: JournalViewProps) {
                           {entry.ticker}
                           <span className={cn(
                             "text-[10px] font-sans font-bold uppercase tracking-widest px-2 py-1 rounded-md",
-                            isProfit ? "bg-profit/10 text-profit" : "bg-loss/10 text-loss"
+                            entry.realized_pnl === null ? "bg-muted text-muted-foreground" : (isProfit ? "bg-profit/10 text-profit" : "bg-loss/10 text-loss")
                           )}>
-                            {isProfit ? "+" : ""}{formatIDR(entry.realized_pnl)}
+                            {entry.realized_pnl !== null ? (
+                              <>
+                                {isProfit ? "+" : ""}{formatIDR(entry.realized_pnl)}
+                              </>
+                            ) : (
+                              "Active Position"
+                            )}
                           </span>
                         </DialogTitle>
                         {isEditing && (

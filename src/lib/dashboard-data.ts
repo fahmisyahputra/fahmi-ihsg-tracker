@@ -6,7 +6,10 @@
  */
 
 import { createClient } from "@/utils/supabase/server";
-import { getStockQuotes, getIndexQuote, getHistoricalPrice } from "@/lib/stock-api";
+import { getStockQuotes, getIndexQuote, getHistoricalPrice } from "./stock-api";
+import { xirr } from "./xirr";
+
+export const revalidate = 0;
 import type { StockQuote } from "@/lib/stock-api";
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -54,6 +57,8 @@ export interface DashboardData {
   dailyPnlPercent: number;
   /** YTD TWR (placeholder for now) */
   ytdTwr: number;
+  /** YTD MWR (XIRR) */
+  ytdMwr: number;
   /** IHSG (^JKSE) quote for comparison */
   ihsgQuote: StockQuote | null;
   /** User's greeting name (from profile or email) */
@@ -66,17 +71,27 @@ export interface DashboardData {
   lastUpdated: string;
   /** Whether lastUpdated represents actual market time (true) or fetch time fallback (false) */
   isMarketTime: boolean;
+  /** Breakdown for TWR calculation */
+  startingEquityYTD: number;
+  netCashFlowYTD: number;
+  /** Breakdown for XIRR calculation */
+  xirrCashFlows: { date: string; amount: number; type: string }[];
 }
 
 // ── Data Fetching ──────────────────────────────────────────────────────────
 
-export async function getDashboardData(): Promise<DashboardData> {
-  const supabase = await createClient();
+export async function getDashboardData(userId?: string, customSupabase?: any): Promise<DashboardData> {
+  const supabase = customSupabase || await createClient();
 
-  // Get current user
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // Get user: either from param or session
+  let user;
+  if (userId) {
+    const { data: { user: foundUser } } = await supabase.auth.admin.getUserById(userId);
+    user = foundUser;
+  } else {
+    const { data: { user: sessionUser } } = await supabase.auth.getUser();
+    user = sessionUser;
+  }
 
   if (!user) {
     return {
@@ -89,12 +104,16 @@ export async function getDashboardData(): Promise<DashboardData> {
       dailyPnl: 0,
       dailyPnlPercent: 0,
       ytdTwr: 0,
+      ytdMwr: 0,
       ihsgQuote: null,
       userDisplayName: "Guest",
       ytdPnl: 0,
       ihsgYtdReturn: 0,
       lastUpdated: new Date().toISOString(),
       isMarketTime: false,
+      startingEquityYTD: 0,
+      netCashFlowYTD: 0,
+      xirrCashFlows: [],
     };
   }
 
@@ -222,7 +241,7 @@ export async function getDashboardData(): Promise<DashboardData> {
     .select("*")
     .eq("user_id", user.id);
 
-  const mutualFunds: MutualFund[] = (mfData || []).map(mf => ({
+  const mutualFunds: MutualFund[] = (mfData || []).map((mf: any) => ({
     id: mf.id,
     fund_name: mf.fund_name,
     type: mf.type,
@@ -231,10 +250,9 @@ export async function getDashboardData(): Promise<DashboardData> {
     last_updated: mf.updated_at || mf.created_at,
   }));
 
-  const mutualFundsValue = mutualFunds.reduce((sum, mf) => sum + mf.current_value, 0);
-
   // Calculate portfolio totals
   const portfolioValue = holdings.reduce((sum, h) => sum + h.marketValue, 0);
+  const mutualFundsValue = mutualFunds.reduce((sum: number, mf: MutualFund) => sum + Number(mf.current_value), 0);
   
   // Deduct portfolio value from cash balance ? Wait. 
   // In a real system, BUY trades deduct from cash_balance, SELL trades add to it.
@@ -281,7 +299,7 @@ export async function getDashboardData(): Promise<DashboardData> {
     .eq("user_id", user.id)
     .gte("sell_date", currentYearStart);
 
-  const realizedPnlYTD = (ytdJournals || []).reduce((sum, j) => sum + Number(j.realized_pnl), 0);
+  const realizedPnlYTD = (ytdJournals || []).reduce((sum: number, j: any) => sum + Number(j.realized_pnl), 0);
 
   const { data: ytdDividends } = await supabase
     .from("cash_flows")
@@ -290,16 +308,15 @@ export async function getDashboardData(): Promise<DashboardData> {
     .eq("type", "DIVIDEND")
     .gte("flow_date", currentYearStart);
 
-  const dividendsYTD = (ytdDividends || []).reduce((sum, d) => sum + Number(d.amount), 0);
+  const dividendsYTD = (ytdDividends || []).reduce((sum: number, d: any) => sum + Number(d.amount), 0);
   
   const totalUnrealizedPnl = holdings.reduce((sum, h) => sum + h.unrealizedPnl, 0);
   // Add mutual fund unrealized PnL as well
   const mutualFundsUnrealizedPnl = mutualFunds.reduce((sum, mf) => sum + (mf.current_value - mf.invested_amount), 0);
   const ytdPnl = realizedPnlYTD + dividendsYTD + totalUnrealizedPnl + mutualFundsUnrealizedPnl;
 
-  // 5. Calculate YTD TWR Fallback (Simple ROI)
+  // 5. Calculate YTD TWR (Using oldest snapshot of current year)
   // netCashFlowYTD = sum(TOPUP) - sum(WITHDRAWAL)
-  // startingEquityYTD = currentEquity - ytdPnl - netCashFlowYTD
   let netCashFlowYTD = 0;
   if (cashFlows) {
     for (const cf of cashFlows) {
@@ -309,7 +326,23 @@ export async function getDashboardData(): Promise<DashboardData> {
       }
     }
   }
-  const startingEquityYTD = totalEquity - ytdPnl - netCashFlowYTD;
+
+  // CRITICAL: Fetch the oldest snapshot of the CURRENT YEAR as the starting balance
+  const { data: jan1Snapshot } = await supabase
+    .from("portfolio_snapshots")
+    .select("total_equity")
+    .eq("user_id", user.id)
+    .gte("created_at", currentYearStart)
+    .order("created_at", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+
+  // If a snapshot exists, use its total_equity. 
+  // Else fallback to back-calculation (Current - PnL - Flows)
+  const startingEquityYTD = jan1Snapshot?.total_equity 
+    ? Number(jan1Snapshot.total_equity) 
+    : (totalEquity - ytdPnl - netCashFlowYTD);
+
   const ytdTwr = startingEquityYTD > 0 ? (ytdPnl / startingEquityYTD) * 100 : 0;
 
   // 6. Calculate IHSG YTD Return
@@ -325,6 +358,46 @@ export async function getDashboardData(): Promise<DashboardData> {
     } catch (error) {
       console.error("Failed to fetch IHSG start of year price:", error);
     }
+  }
+  
+  // 6.5 Calculate YTD MWR (XIRR)
+  let ytdMwr = 0;
+  let xirrCashFlows: { date: string; amount: number; type: string }[] = [];
+
+  if (cashFlows) {
+    // 1. Filter cash flows to only YTD
+    const ytdCashFlows = cashFlows.filter((cf: any) => new Date(cf.flow_date) >= new Date(currentYearStart));
+
+    // 2. Add Starting Equity as the very first cash flow point for XIRR (Investment at start of year)
+    // We treat it like a TOPUP (negative flow) for XIRR calculation
+    xirrCashFlows.push({
+      date: currentYearStart,
+      amount: startingEquityYTD,
+      type: "YEAR_START"
+    });
+
+    // 3. Add all YTD cash flows
+    ytdCashFlows.forEach((cf: any) => {
+      xirrCashFlows.push({
+        date: cf.flow_date,
+        amount: Number(cf.amount),
+        type: cf.type
+      });
+    });
+    
+    // 4. Map for calculation
+    const calculationFlows = xirrCashFlows.map(cf => ({
+      date: new Date(cf.date),
+      amount: cf.type === "TOPUP" || cf.type === "YEAR_START" ? -cf.amount : cf.amount,
+    }));
+
+    // 5. Add current total equity as final positive flow today
+    calculationFlows.push({
+      date: new Date(),
+      amount: totalEquity
+    });
+    
+    ytdMwr = xirr(calculationFlows) * 100;
   }
 
   // 7. Find latest market timestamp from quotes
@@ -357,11 +430,15 @@ export async function getDashboardData(): Promise<DashboardData> {
     dailyPnl,
     dailyPnlPercent,
     ytdTwr, 
+    ytdMwr: Number(ytdMwr.toFixed(2)),
     ihsgQuote,
     userDisplayName,
     ytdPnl,
     ihsgYtdReturn,
     lastUpdated,
     isMarketTime,
+    startingEquityYTD,
+    netCashFlowYTD,
+    xirrCashFlows: xirrCashFlows.map(f => ({ date: f.date, amount: f.amount, type: f.type })),
   };
 }

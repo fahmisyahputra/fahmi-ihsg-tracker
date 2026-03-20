@@ -112,7 +112,7 @@ function AnalyticsDashboard({
   loading
 }: { 
   type: string; 
-  metrics: { totalEquity: number; nominalGrowth: number; percentGrowth: number }; 
+  metrics: { totalEquity: number; nominalGrowth: number; percentGrowth: number; xirr: number }; 
   chartData: any[];
   loading?: boolean;
 }) {
@@ -154,19 +154,34 @@ function AnalyticsDashboard({
         <h2 className="text-3xl font-bold font-mono tracking-tight text-foreground">
           {formatIDR(metrics.totalEquity)}
         </h2>
-        <div className="flex items-center gap-2 mt-1">
-          <span className={cn(
-            "text-sm font-bold font-mono px-2 py-0.5 rounded-full",
-            metrics.nominalGrowth >= 0 ? "bg-profit/10 text-profit" : "bg-loss/10 text-loss"
-          )}>
-            {metrics.nominalGrowth >= 0 ? "+" : ""}{formatIDR(metrics.nominalGrowth)}
-          </span>
-          <span className={cn(
-            "text-sm font-bold font-mono",
-            metrics.percentGrowth >= 0 ? "text-profit" : "text-loss"
-          )}>
-            ({metrics.percentGrowth >= 0 ? "+" : ""}{metrics.percentGrowth}%)
-          </span>
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mt-1">
+          <div className="flex items-center gap-2">
+            <span className={cn(
+              "text-sm font-bold font-mono px-2 py-0.5 rounded-full",
+              metrics.nominalGrowth >= 0 ? "bg-profit/10 text-profit" : "bg-loss/10 text-loss"
+            )}>
+              {metrics.nominalGrowth >= 0 ? "+" : ""}{formatIDR(metrics.nominalGrowth)}
+            </span>
+            <span className={cn(
+              "text-sm font-bold font-mono",
+              metrics.percentGrowth >= 0 ? "text-profit" : "text-loss"
+            )}>
+              ({metrics.percentGrowth >= 0 ? "+" : ""}{metrics.percentGrowth}%)
+            </span>
+            <span className="text-[10px] font-bold text-muted-foreground uppercase ml-1">TWR</span>
+          </div>
+
+          <div className="h-3 w-px bg-border hidden sm:block" />
+
+          <div className="flex items-center gap-2">
+            <span className={cn(
+              "text-sm font-bold font-mono",
+              metrics.xirr >= 0 ? "text-profit" : "text-loss"
+            )}>
+              {metrics.xirr >= 0 ? "+" : ""}{metrics.xirr}%
+            </span>
+            <span className="text-[10px] font-bold text-muted-foreground uppercase">MWR (XIRR)</span>
+          </div>
         </div>
       </div>
 
@@ -358,7 +373,7 @@ export default function PerformancePage() {
     );
   }
 
-  const currentMetrics = perfData || { totalEquity: 0, nominalGrowth: 0, percentGrowth: 0 };
+  const currentMetrics = perfData || { totalEquity: 0, nominalGrowth: 0, percentGrowth: 0, xirr: 0 };
 
   return (
     <div className="flex flex-col gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-10 overflow-x-hidden">

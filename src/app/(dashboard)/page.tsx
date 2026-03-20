@@ -45,8 +45,13 @@ export default async function HomePage() {
       {/* Performance TWR vs IHSG */}
       <PerformanceCard 
         ytdTwr={data.ytdTwr} 
+        ytdMwr={data.ytdMwr}
         ihsgQuote={data.ihsgQuote} 
-        ihsgYtdReturn={data.ihsgYtdReturn} 
+        ihsgYtdReturn={data.ihsgYtdReturn}
+        startingEquityYTD={data.startingEquityYTD}
+        netCashFlowYTD={data.netCashFlowYTD}
+        totalEquity={data.totalEquity}
+        xirrCashFlows={data.xirrCashFlows}
       />
 
       {/* Top Positions */}
