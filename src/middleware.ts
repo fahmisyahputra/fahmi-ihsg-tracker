@@ -1,7 +1,12 @@
 import { updateSession } from "@/utils/supabase/middleware";
-import { type NextRequest } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
 
 export async function middleware(request: NextRequest) {
+  // 1. VIP Bypass for Cron Jobs
+  if (request.nextUrl.pathname.startsWith("/api/cron/")) {
+    return NextResponse.next();
+  }
+
   return await updateSession(request);
 }
 
