@@ -88,7 +88,7 @@ export function MetricCards({
         >
           <div className="flex items-center gap-1.5">
             <Wallet className="size-3.5 text-primary" />
-            <p className="text-xs font-medium text-muted-foreground">Cash (RDN)</p>
+            <p className="text-xs font-medium text-muted-foreground">Cash RDN/Reksadana</p>
           </div>
           <p className="mt-1.5 text-base font-bold font-mono text-foreground leading-none">
             {formatIDR(cashBalance)}

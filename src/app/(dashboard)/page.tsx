@@ -6,6 +6,8 @@ import { TopPositions } from "@/components/dashboard/top-positions";
 import { LastUpdated } from "@/components/dashboard/last-updated";
 
 export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
+export const revalidate = 0;
 
 export default async function HomePage() {
   const data = await getDashboardData();

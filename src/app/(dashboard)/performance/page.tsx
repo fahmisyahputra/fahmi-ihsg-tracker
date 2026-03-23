@@ -51,8 +51,18 @@ import { Calendar } from "@/components/ui/calendar";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { formatIDR } from "@/lib/twr";
 import { cn } from "@/lib/utils";
-import { fetchPerformanceData } from "@/app/actions/performance";
+import { fetchPerformanceData, fetchAdvancedAnalytics, fetchIpoAnalytics } from "@/app/actions/performance";
 import type { PerformanceStats } from "@/lib/performance-data";
+import type { AdvancedAnalytics, IpoAnalytics } from "@/lib/analytics-data";
+import { WinRateWidget } from "@/components/dashboard/win-rate-widget";
+import { TopTickersWidget } from "@/components/dashboard/top-tickers-widget";
+import { CumulativePnLWidget } from "@/components/dashboard/cumulative-pnl-widget";
+import { TradeDurationWidget } from "@/components/dashboard/trade-duration-widget";
+import { IpoEfficiencyWidget } from "@/components/dashboard/ipo-efficiency-widget";
+import { IpoHitRateWidget } from "@/components/dashboard/ipo-hit-rate-widget";
+import { IpoOversubscriptionWidget } from "@/components/dashboard/ipo-oversubscription-widget";
+import { IpoHallOfFameWidget } from "@/components/dashboard/ipo-hall-of-fame-widget";
+import { UnderwriterMatrixWidget } from "@/components/dashboard/underwriter-matrix-widget";
 
 // Reusable Date Range Picker Component
 function DatePickerWithRange({
@@ -109,12 +119,24 @@ function AnalyticsDashboard({
   type, 
   metrics, 
   chartData,
-  loading
+  loading,
+  range,
+  advancedAnalytics,
+  analyticsLoading,
+  timeframeLabel,
+  ipoAnalytics,
+  ipoLoading,
 }: { 
   type: string; 
-  metrics: { totalEquity: number; nominalGrowth: number; percentGrowth: number; xirr: number }; 
+  metrics: { totalEquity: number; nominalGrowth: number; percentGrowth: number; twr: number; xirr: number }; 
   chartData: any[];
   loading?: boolean;
+  range: string;
+  advancedAnalytics: AdvancedAnalytics | null;
+  analyticsLoading?: boolean;
+  timeframeLabel: string;
+  ipoAnalytics: IpoAnalytics | null;
+  ipoLoading?: boolean;
 }) {
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
@@ -149,7 +171,7 @@ function AnalyticsDashboard({
       {/* Hero Metrics */}
       <div className="flex flex-col gap-1 px-1">
         <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-          {type === "all" ? "Total Return" : `${type.toUpperCase()} Return`}
+          Total Portfolio Value
         </p>
         <h2 className="text-3xl font-bold font-mono tracking-tight text-foreground">
           {formatIDR(metrics.totalEquity)}
@@ -166,9 +188,21 @@ function AnalyticsDashboard({
               "text-sm font-bold font-mono",
               metrics.percentGrowth >= 0 ? "text-profit" : "text-loss"
             )}>
-              ({metrics.percentGrowth >= 0 ? "+" : ""}{metrics.percentGrowth}%)
+              ({metrics.percentGrowth >= 0 ? "+" : ""}{metrics.percentGrowth.toFixed(2)}%)
             </span>
-            <span className="text-[10px] font-bold text-muted-foreground uppercase ml-1">TWR</span>
+            <span className="text-[10px] font-bold text-muted-foreground uppercase ml-1">{range} Absolute Return</span>
+          </div>
+
+          <div className="h-3 w-px bg-border hidden sm:block" />
+
+          <div className="flex items-center gap-2">
+            <span className={cn(
+              "text-sm font-bold font-mono",
+              metrics.twr >= 0 ? "text-profit" : "text-loss"
+            )}>
+              {metrics.twr >= 0 ? "+" : ""}{metrics.twr.toFixed(2)}%
+            </span>
+            <span className="text-[10px] font-bold text-muted-foreground uppercase">{range} TWR</span>
           </div>
 
           <div className="h-3 w-px bg-border hidden sm:block" />
@@ -178,9 +212,9 @@ function AnalyticsDashboard({
               "text-sm font-bold font-mono",
               metrics.xirr >= 0 ? "text-profit" : "text-loss"
             )}>
-              {metrics.xirr >= 0 ? "+" : ""}{metrics.xirr}%
+              {metrics.xirr >= 0 ? "+" : ""}{metrics.xirr.toFixed(2)}%
             </span>
-            <span className="text-[10px] font-bold text-muted-foreground uppercase">MWR (XIRR)</span>
+            <span className="text-[10px] font-bold text-muted-foreground uppercase">{range} MWR (XIRR)</span>
           </div>
         </div>
       </div>
@@ -272,6 +306,36 @@ function AnalyticsDashboard({
           </ResponsiveContainer>
         </div>
       </div>
+
+      {/* Advanced Trading Analytics */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <WinRateWidget data={advancedAnalytics} loading={analyticsLoading} timeframeLabel={timeframeLabel} />
+        <CumulativePnLWidget data={advancedAnalytics} loading={analyticsLoading} timeframeLabel={timeframeLabel} />
+      </div>
+      
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <TopTickersWidget data={advancedAnalytics} loading={analyticsLoading} timeframeLabel={timeframeLabel} />
+        <TradeDurationWidget data={advancedAnalytics} loading={analyticsLoading} timeframeLabel={timeframeLabel} />
+      </div>
+
+      {/* IPO Hunter Dashboard — only visible when IPO tab is active */}
+      {type === "ipo" && (
+        <>
+          <div className="flex items-center gap-2 mt-2">
+            <span className="text-[10px] font-bold uppercase tracking-widest text-amber-500">🏹 IPO Hunter Dashboard</span>
+            <div className="flex-1 h-px bg-amber-500/20" />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <IpoHitRateWidget data={ipoAnalytics} loading={ipoLoading} timeframeLabel={timeframeLabel} />
+            <IpoEfficiencyWidget data={ipoAnalytics} loading={ipoLoading} timeframeLabel={timeframeLabel} />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <IpoOversubscriptionWidget data={ipoAnalytics} loading={ipoLoading} timeframeLabel={timeframeLabel} />
+            <UnderwriterMatrixWidget data={ipoAnalytics} loading={ipoLoading} timeframeLabel={timeframeLabel} />
+          </div>
+          <IpoHallOfFameWidget data={ipoAnalytics} loading={ipoLoading} timeframeLabel={timeframeLabel} />
+        </>
+      )}
     </div>
   );
 }
@@ -309,6 +373,27 @@ export default function PerformancePage() {
   const [tableData, setTableData] = useState<{ ticker: string; pnl: number; pnlPercent: number }[]>([]);
   const [loading, setLoading] = useState(true);
   const [tableLoading, setTableLoading] = useState(false);
+  const [advancedAnalytics, setAdvancedAnalytics] = useState<AdvancedAnalytics | null>(null);
+  const [analyticsLoading, setAnalyticsLoading] = useState(true);
+  const [ipoAnalytics, setIpoAnalytics] = useState<IpoAnalytics | null>(null);
+  const [ipoLoading, setIpoLoading] = useState(false);
+
+  const timeframeLabel = useMemo(() => {
+    if (year === "custom") return "Custom Range";
+    if (year !== new Date().getFullYear().toString() && range === "ALL") return `Year ${year}`;
+    if (year !== new Date().getFullYear().toString()) return `${range} ${year}`;
+    
+    switch (range) {
+      case "1W": return "Last 1 Week";
+      case "1M": return "Last 1 Month";
+      case "3M": return "Last 3 Months";
+      case "6M": return "Last 6 Months";
+      case "YTD": return "Year to Date";
+      case "1Y": return "Last 1 Year";
+      case "ALL": return "All-Time";
+      default: return range;
+    }
+  }, [range, year]);
 
   // Fetch Main Performance Data
   const loadMainData = useCallback(async () => {
@@ -352,6 +437,49 @@ export default function PerformancePage() {
     loadTableData();
   }, [loadTableData]);
 
+  const fetchAnalytics = useCallback(async () => {
+    setAnalyticsLoading(true);
+    try {
+      const data = await fetchAdvancedAnalytics({
+        year,
+        range,
+        customRange: year === "custom" ? dateRange : undefined,
+        assetType: activeTab,
+      });
+      setAdvancedAnalytics(data);
+    } catch (e) {
+      console.error("Failed to fetch advanced analytics:", e);
+    } finally {
+      setAnalyticsLoading(false);
+    }
+  }, [year, range, dateRange, activeTab]);
+
+  useEffect(() => {
+    fetchAnalytics();
+  }, [fetchAnalytics]);
+
+  // Fetch IPO-specific data when IPO tab is active
+  const loadIpoData = useCallback(async () => {
+    if (activeTab !== "ipo") return;
+    setIpoLoading(true);
+    try {
+      const data = await fetchIpoAnalytics({
+        year,
+        range,
+        customRange: year === "custom" ? dateRange : undefined,
+      });
+      setIpoAnalytics(data);
+    } catch (e) {
+      console.error("Failed to fetch IPO analytics:", e);
+    } finally {
+      setIpoLoading(false);
+    }
+  }, [year, range, dateRange, activeTab]);
+
+  useEffect(() => {
+    loadIpoData();
+  }, [loadIpoData]);
+
   const sortedMovers = useMemo(() => {
     return tableData
       .filter((m) => m.ticker.toLowerCase().includes(search.toLowerCase()))
@@ -373,7 +501,7 @@ export default function PerformancePage() {
     );
   }
 
-  const currentMetrics = perfData || { totalEquity: 0, nominalGrowth: 0, percentGrowth: 0, xirr: 0 };
+  const currentMetrics = perfData || { totalEquity: 0, nominalGrowth: 0, percentGrowth: 0, twr: 0, xirr: 0 };
 
   return (
     <div className="flex flex-col gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-10 overflow-x-hidden">
@@ -405,7 +533,7 @@ export default function PerformancePage() {
 
           <Tabs value={range} onValueChange={setRange} className="w-auto">
             <TabsList className="bg-muted/50 border border-border h-8 p-1">
-              {["1W", "1M", "3M", "6M", "YTD", "ALL"].map((r) => (
+              {["1W", "1M", "3M", "6M", "YTD", "1Y", "ALL"].map((r) => (
                 <TabsTrigger 
                   key={r} 
                   value={r}
@@ -432,7 +560,7 @@ export default function PerformancePage() {
           <TabsList className="bg-muted/30 border border-border h-9">
             {["all", "stocks", "ipo", "dividends"].map(t => (
               <TabsTrigger key={t} value={t} className="text-xs capitalize rounded-md px-4">
-                {t === "all" ? "All-In" : t}
+                {t === "all" ? "All-In" : t === "ipo" ? "IPO" : t}
               </TabsTrigger>
             ))}
           </TabsList>
@@ -444,6 +572,12 @@ export default function PerformancePage() {
             metrics={currentMetrics} 
             chartData={perfData?.monthlyData || []} 
             loading={loading}
+            range={range}
+            advancedAnalytics={advancedAnalytics}
+            analyticsLoading={analyticsLoading}
+            timeframeLabel={timeframeLabel}
+            ipoAnalytics={ipoAnalytics}
+            ipoLoading={ipoLoading}
           />
         </TabsContent>
       </Tabs>
